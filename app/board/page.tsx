@@ -4,10 +4,10 @@ import type React from "react"
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { BoardColumn } from "@/components/board-column"
+import { BoardColumn } from "../_components/board-column"
 import { Users, LogOut, Search, Filter, BarChart3, Download, Upload, Clock } from "lucide-react"
-import { Input } from "@/components/ui/input"
-import { handleLogout } from "@/utils/auth" // Import handleLogout from auth utils
+import { Input } from "../_components/ui/input"
+import { handleLogout } from "../utils/auth" // Import handleLogout from auth utils
 
 interface User {
   name: string
@@ -36,6 +36,34 @@ interface Card {
   tags: string[]
 }
 
+const getStoredUser = (): User | null => {
+  if (typeof window === "undefined") return null
+
+  const stored = localStorage.getItem("wp-user")
+  if (!stored) return null
+
+  try {
+    return JSON.parse(stored) as User
+  } catch (error) {
+    console.error("Failed to parse stored user:", error)
+    return null
+  }
+}
+
+const getStoredCards = (): Card[] => {
+  if (typeof window === "undefined") return []
+
+  const stored = localStorage.getItem("wp-cards")
+  if (!stored) return []
+
+  try {
+    return JSON.parse(stored) as Card[]
+  } catch (error) {
+    console.error("Failed to parse stored cards:", error)
+    return []
+  }
+}
+
 const COLUMNS = [
   { id: "ideas", title: "Ideas", color: "wp-cyan" },
   { id: "discuss", title: "Discuss", color: "wp-magenta" },
@@ -46,7 +74,6 @@ export default function BoardPage() {
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [cards, setCards] = useState<Card[]>([])
-  const [activeUsers, setActiveUsers] = useState<User[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [filterPriority, setFilterPriority] = useState<"all" | "high" | "medium" | "low">("all")
   const [filterUser, setFilterUser] = useState<string | "all">("all")
@@ -55,21 +82,31 @@ export default function BoardPage() {
   const [sessionTime, setSessionTime] = useState(0)
 
   useEffect(() => {
-    const userData = localStorage.getItem("wp-user")
-    if (!userData) {
+    const storedUser = getStoredUser()
+    const storedCards = getStoredCards()
+    setUser(storedUser)
+    setCards(storedCards)
+
+    if (!storedUser) {
       router.push("/")
       return
     }
-
-    const parsedUser = JSON.parse(userData)
-    setUser(parsedUser)
-    setActiveUsers([parsedUser])
-
-    const savedCards = localStorage.getItem("wp-cards")
-    if (savedCards) {
-      setCards(JSON.parse(savedCards))
-    }
   }, [router])
+
+  useEffect(() => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === "wp-user") {
+        setUser(getStoredUser())
+      }
+
+      if (event.key === "wp-cards") {
+        setCards(getStoredCards())
+      }
+    }
+
+    window.addEventListener("storage", handleStorageChange)
+    return () => window.removeEventListener("storage", handleStorageChange)
+  }, [])
 
   useEffect(() => {
     if (cards.length > 0) {
@@ -236,6 +273,8 @@ export default function BoardPage() {
 
     return matchesSearch && matchesPriority && matchesUser
   })
+
+  const activeUsers = user ? [user] : []
 
   const stats = {
     total: cards.length,

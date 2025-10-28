@@ -3,8 +3,8 @@
 import type React from "react"
 
 import { useState } from "react"
-import { BoardCard } from "@/components/board-card"
-import { Textarea } from "@/components/ui/textarea"
+import { BoardCard } from "./board-card"
+import { Textarea } from "./ui/textarea"
 import { Plus, X } from "lucide-react"
 
 interface User {

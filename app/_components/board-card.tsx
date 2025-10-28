@@ -4,8 +4,8 @@ import type React from "react"
 
 import { useState } from "react"
 import { Trash2, ChevronDown, ChevronUp, Tag, ThumbsUp, ThumbsDown, MessageSquare } from "lucide-react"
-import { Textarea } from "@/components/ui/textarea"
-import { Input } from "@/components/ui/input"
+import { Textarea } from "./ui/textarea"
+import { Input } from "./ui/input"
 
 interface Comment {
   id: string
