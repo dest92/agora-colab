@@ -79,7 +79,9 @@ export const useBoardWebSocket = ({
       // Check if the card was created by the current user
       const currentUserId = authApi.getCurrentUser()?.id;
       if (authorId === currentUserId) {
-        console.log("✅ Card created by current user (optimistic update already applied)");
+        console.log(
+          "✅ Card created by current user (optimistic update already applied)"
+        );
         return;
       }
 
@@ -247,11 +249,5 @@ export const useBoardWebSocket = ({
       socketClient.off("card:unarchived", handleCardUnarchived);
       socketClient.off("presence:update", handlePresenceUpdate);
     };
-  }, [
-    boardId,
-    setCards,
-    setActiveUsers,
-    loadCards,
-    getCurrentUser,
-  ]);
+  }, [boardId, setCards, setActiveUsers, loadCards, getCurrentUser]);
 };

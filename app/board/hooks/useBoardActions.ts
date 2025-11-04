@@ -59,7 +59,12 @@ export const useBoardActions = ({
 
     // Then make the API call in the background
     try {
-      console.log("📝 Creating card in backend:", { columnId, laneId, content, priority });
+      console.log("📝 Creating card in backend:", {
+        columnId,
+        laneId,
+        content,
+        priority,
+      });
 
       const newCard = await boardsApi.createCard(boardId, {
         content,
