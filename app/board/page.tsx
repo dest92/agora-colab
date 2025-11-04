@@ -27,6 +27,7 @@ import { useBoardActions } from "./hooks/useBoardActions";
 import { useBoardWebSocket } from "./hooks/useBoardWebSocket";
 import { InviteUserModal } from "@/app/_components/invite-user-modal-search";
 import { ActiveUsersDropdown } from "@/app/_components/active-users-dropdown";
+import { NotificationBell } from "@/app/_components/notification-bell";
 
 const getCurrentUser = (): User => {
   const user = authApi.getCurrentUser();
@@ -266,6 +267,8 @@ export default function BoardPage() {
                   style={{ backgroundColor: user.color }}
                 />
               </div>
+
+              <NotificationBell />
 
               <button
                 onClick={handleLogout}

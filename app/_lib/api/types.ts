@@ -158,6 +158,8 @@ export type WebSocketEvent =
   // Votes (cuando se migren)
   | "vote:cast"
   | "vote:removed"
+  // Notifications
+  | "notification:created"
   // Presence
   | "presence:update";
 

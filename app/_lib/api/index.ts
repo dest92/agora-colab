@@ -28,6 +28,8 @@ export type {
 } from "./workspaces";
 export { sessionsApi } from "./sessions";
 export type { Session, CreateSessionDto } from "./sessions";
+export { notificationsApi } from "./notifications";
+export type { Notification } from "./notifications";
 
 // Socket.IO Client
 export { socketClient, useSocket } from "./socket";

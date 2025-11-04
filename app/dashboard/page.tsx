@@ -12,6 +12,7 @@ import {
 import { Users, Plus, Folder, Layout, LogOut, UserPlus } from "lucide-react";
 import { InviteUserModal } from "@/app/_components/invite-user-modal-search";
 import { WorkspaceMembers } from "@/app/_components/workspace-members";
+import { NotificationBell } from "@/app/_components/notification-bell";
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -186,6 +187,8 @@ export default function DashboardPage() {
                 </span>
               </div>
             )}
+
+            <NotificationBell />
 
             <button
               onClick={handleLogout}
@@ -370,7 +373,7 @@ export default function DashboardPage() {
 
           {/* Members Panel - Only show when workspace is selected */}
           {selectedWorkspaceId && (
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 min-h-[600px] flex">
               <WorkspaceMembers
                 key={`members-${selectedWorkspaceId}-${membersKey}`}
                 workspaceId={selectedWorkspaceId}
