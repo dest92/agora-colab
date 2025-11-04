@@ -3,7 +3,7 @@
  * Handles all board actions (create, update, delete cards, comments, etc.)
  */
 
-import { boardsApi, commentsApi } from "@/app/_lib/api";
+import { boardsApi, commentsApi, votesApi } from "@/app/_lib/api";
 import { mapColumnToLaneId } from "../utils/boardMappers";
 import type { Card, Comment, User } from "./useBoardData";
 
@@ -150,19 +150,24 @@ export const useBoardActions = ({
     }
   };
 
-  const handleVote = (cardId: string, type: "like" | "dislike") => {
-    if (!user) return;
+  const handleVote = async (cardId: string, type: "like" | "dislike") => {
+    if (!user || !boardId) return;
 
-    setCards(
-      cards.map((card) => {
+    const voteType = type === "like" ? "up" : "down";
+
+    // Optimistic update
+    setCards((prevCards) =>
+      prevCards.map((card) => {
         if (card.id !== cardId) return card;
 
         const newCard = { ...card };
 
         if (type === "like") {
           if (newCard.likes.includes(user.name)) {
+            // Remove like
             newCard.likes = newCard.likes.filter((name) => name !== user.name);
           } else {
+            // Add like and remove dislike if present
             newCard.likes = [...newCard.likes, user.name];
             newCard.dislikes = newCard.dislikes.filter(
               (name) => name !== user.name
@@ -170,10 +175,12 @@ export const useBoardActions = ({
           }
         } else {
           if (newCard.dislikes.includes(user.name)) {
+            // Remove dislike
             newCard.dislikes = newCard.dislikes.filter(
               (name) => name !== user.name
             );
           } else {
+            // Add dislike and remove like if present
             newCard.dislikes = [...newCard.dislikes, user.name];
             newCard.likes = newCard.likes.filter((name) => name !== user.name);
           }
@@ -182,6 +189,16 @@ export const useBoardActions = ({
         return newCard;
       })
     );
+
+    // Call API
+    try {
+      await votesApi.vote(boardId, cardId, voteType);
+      console.log(`✅ Vote ${voteType} registered for card ${cardId}`);
+    } catch (error) {
+      console.error("❌ Failed to vote:", error);
+      // Revert optimistic update on error
+      setCards(cards);
+    }
   };
 
   const handleAddComment = async (cardId: string, content: string) => {

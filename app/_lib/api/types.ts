@@ -155,8 +155,8 @@ export type WebSocketEvent =
   | "assignee:removed"
   // Comments
   | "comment:created"
-  // Votes (cuando se migren)
-  | "vote:cast"
+  // Votes
+  | "vote:changed"
   | "vote:removed"
   // Notifications
   | "notification:created"

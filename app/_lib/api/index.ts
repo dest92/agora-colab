@@ -30,6 +30,8 @@ export { sessionsApi } from "./sessions";
 export type { Session, CreateSessionDto } from "./sessions";
 export { notificationsApi } from "./notifications";
 export type { Notification } from "./notifications";
+export { votesApi } from "./votes";
+export type { VoteSummary, VoteResponse, Voter, UserVote } from "./votes";
 
 // Socket.IO Client
 export { socketClient, useSocket } from "./socket";

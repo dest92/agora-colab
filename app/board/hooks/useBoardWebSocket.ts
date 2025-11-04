@@ -199,6 +199,65 @@ export const useBoardWebSocket = ({
       console.log("✅ Cards reloaded after unarchive");
     };
 
+    const handleVoteChanged = async (payload: any) => {
+      console.log("🔔 Vote changed event:", payload);
+
+      const { cardId, voterId, action, summary } = payload;
+
+      // Check if the vote was made by the current user
+      const currentUserId = authApi.getCurrentUser()?.id;
+      if (voterId === currentUserId) {
+        console.log(
+          "✅ Vote by current user (optimistic update already applied)"
+        );
+        return;
+      }
+
+      // Get voter display name
+      const voterName = await getUserDisplayName(voterId);
+
+      // Update the card's vote counts
+      setCards((prevCards) =>
+        prevCards.map((card) => {
+          if (card.id !== cardId) return card;
+
+          // For simplicity, we'll just update the likes/dislikes arrays
+          // In a real scenario, you might want to store the actual vote data
+          const newCard = { ...card };
+
+          // This is a simplified update - you may want to track actual voters
+          // For now, we'll just ensure the voter is in the right list
+          if (action === "removed") {
+            newCard.likes = newCard.likes.filter((name) => name !== voterName);
+            newCard.dislikes = newCard.dislikes.filter(
+              (name) => name !== voterName
+            );
+          } else if (action === "added" || action === "changed") {
+            const voteType = payload.voteType;
+            if (voteType === "up") {
+              if (!newCard.likes.includes(voterName)) {
+                newCard.likes = [...newCard.likes, voterName];
+              }
+              newCard.dislikes = newCard.dislikes.filter(
+                (name) => name !== voterName
+              );
+            } else if (voteType === "down") {
+              if (!newCard.dislikes.includes(voterName)) {
+                newCard.dislikes = [...newCard.dislikes, voterName];
+              }
+              newCard.likes = newCard.likes.filter(
+                (name) => name !== voterName
+              );
+            }
+          }
+
+          return newCard;
+        })
+      );
+
+      console.log(`✅ Vote ${action} for card ${cardId} by ${voterName}`);
+    };
+
     const handlePresenceUpdate = async (payload: any) => {
       console.log("👥 Presence update:", payload);
 
@@ -237,6 +296,7 @@ export const useBoardWebSocket = ({
     socketClient.on("comment:created", handleCommentCreated);
     socketClient.on("card:archived", handleCardArchived);
     socketClient.on("card:unarchived", handleCardUnarchived);
+    socketClient.on("vote:changed", handleVoteChanged);
     socketClient.on("presence:update", handlePresenceUpdate);
 
     return () => {
@@ -247,6 +307,7 @@ export const useBoardWebSocket = ({
       socketClient.off("comment:created", handleCommentCreated);
       socketClient.off("card:archived", handleCardArchived);
       socketClient.off("card:unarchived", handleCardUnarchived);
+      socketClient.off("vote:changed", handleVoteChanged);
       socketClient.off("presence:update", handlePresenceUpdate);
     };
   }, [boardId, setCards, setActiveUsers, loadCards, getCurrentUser]);

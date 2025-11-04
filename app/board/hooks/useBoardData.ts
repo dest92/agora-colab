@@ -4,7 +4,7 @@
  */
 
 import { useState } from "react";
-import { boardsApi, commentsApi, authApi } from "@/app/_lib/api";
+import { boardsApi, commentsApi, authApi, votesApi } from "@/app/_lib/api";
 import { getUserDisplayName } from "../utils/userCache";
 import { mapLaneToColumn } from "../utils/boardMappers";
 
@@ -132,6 +132,33 @@ export const useBoardData = () => {
             );
           }
 
+          // Load votes for this card
+          let likes: string[] = [];
+          let dislikes: string[] = [];
+          try {
+            const voters = await votesApi.getVoters(boardId, apiCard.id);
+
+            // Convert voter IDs to display names
+            for (const voter of voters) {
+              const voterName = await getUserDisplayName(voter.voterId);
+              if (voter.weight === 1) {
+                likes.push(voterName);
+              } else if (voter.weight === -1) {
+                dislikes.push(voterName);
+              }
+            }
+
+            console.log(`✅ Loaded votes for card ${apiCard.id}:`, {
+              likes,
+              dislikes,
+            });
+          } catch (error) {
+            console.error(
+              `❌ Failed to load votes for card ${apiCard.id}:`,
+              error
+            );
+          }
+
           return {
             id: apiCard.id,
             content: apiCard.content,
@@ -143,8 +170,8 @@ export const useBoardData = () => {
             },
             column,
             priority: apiCard.priority,
-            likes: [],
-            dislikes: [],
+            likes,
+            dislikes,
             comments,
             timestamp: new Date(apiCard.createdAt).getTime(),
             tags: [],
