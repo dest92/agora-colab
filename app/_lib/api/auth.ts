@@ -152,11 +152,22 @@ class AuthApi {
    * Initialize auth from localStorage (call on app startup)
    */
   initializeAuth(): void {
-    if (typeof window === "undefined") return;
+    if (typeof window === "undefined") {
+      console.log("⚠️ initializeAuth called on server side");
+      return;
+    }
 
     const token = localStorage.getItem("agora-access-token");
+    console.log("🔍 Checking localStorage for token:", {
+      hasToken: !!token,
+      tokenPreview: token?.substring(0, 20),
+    });
+
     if (token) {
       apiClient.setToken(token);
+      console.log("✅ Token restored from localStorage");
+    } else {
+      console.warn("⚠️ No token found in localStorage");
     }
   }
 

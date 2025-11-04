@@ -18,6 +18,7 @@ import {
   Upload,
   Clock,
   UserPlus,
+  ArrowLeft,
 } from "lucide-react";
 import { Input } from "../_components/ui/input";
 import { authApi, workspacesApi } from "@/app/_lib/api";
@@ -241,9 +242,18 @@ export default function BoardPage() {
         <div className="container mx-auto px-3 sm:px-6 py-3 sm:py-4">
           {/* Top row - Title and User */}
           <div className="flex items-center justify-between mb-3 sm:mb-0">
-            <h1 className="text-lg sm:text-2xl font-semibold tracking-tight text-white">
-              decision board
-            </h1>
+            <div className="flex items-center gap-2 sm:gap-4">
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="w-10 h-10 sm:w-12 sm:h-12 bg-[#2d2d2d] hover:bg-[#00AFF0] transition-colors flex items-center justify-center group"
+                title="Back to Dashboard"
+              >
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:scale-110 transition-transform" />
+              </button>
+              <h1 className="text-lg sm:text-2xl font-semibold tracking-tight text-white">
+                decision board
+              </h1>
+            </div>
 
             <div className="flex items-center gap-2 sm:gap-3">
               <div className="flex items-center gap-2 px-2 sm:px-4 py-2 bg-[#2d2d2d]">

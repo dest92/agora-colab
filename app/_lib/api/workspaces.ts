@@ -104,6 +104,21 @@ class WorkspacesApi {
       `/workspaces/users/search?q=${encodeURIComponent(query)}`
     );
   }
+
+  /**
+   * Update member role in workspace
+   * PATCH /workspaces/:workspaceId/members/:userId/role
+   */
+  async updateMemberRole(
+    workspaceId: string,
+    userId: string,
+    role: "owner" | "admin" | "member"
+  ): Promise<{ updated: boolean }> {
+    return apiClient.patch<{ updated: boolean }>(
+      `/workspaces/${workspaceId}/members/${userId}/role`,
+      { role }
+    );
+  }
 }
 
 export const workspacesApi = new WorkspacesApi();

@@ -1,14 +1,12 @@
 "use client";
 
-import { useEffect } from "react";
 import { authApi } from "./api";
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    // Initialize auth from localStorage on app load
-    authApi.initializeAuth();
-    console.log("🔄 Auth initialized from localStorage");
-  }, []);
+// Initialize auth IMMEDIATELY (synchronously) before any renders
+if (typeof window !== "undefined") {
+  authApi.initializeAuth();
+}
 
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }

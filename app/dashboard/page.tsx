@@ -59,8 +59,20 @@ export default function DashboardPage() {
         createdAt: invite.joinedAt,
       }));
 
-      // Combine both lists
-      const allWorkspaces = [...ownedWorkspaces, ...invitedAsWorkspaces];
+      // Combine and deduplicate by workspace ID
+      const workspaceMap = new Map<string, Workspace>();
+
+      // Add owned workspaces first (they take priority)
+      ownedWorkspaces.forEach((ws) => workspaceMap.set(ws.id, ws));
+
+      // Add invited workspaces only if not already in map
+      invitedAsWorkspaces.forEach((ws) => {
+        if (!workspaceMap.has(ws.id)) {
+          workspaceMap.set(ws.id, ws);
+        }
+      });
+
+      const allWorkspaces = Array.from(workspaceMap.values());
       setWorkspaces(allWorkspaces);
 
       // Auto-select first workspace if available
