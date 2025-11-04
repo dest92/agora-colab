@@ -1,315 +1,557 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import { BoardColumn } from "../_components/board-column"
-import { Users, LogOut, Search, Filter, BarChart3, Download, Upload, Clock } from "lucide-react"
-import { Input } from "../_components/ui/input"
-import { handleLogout } from "../utils/auth" // Import handleLogout from auth utils
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { BoardColumn } from "../_components/board-column";
+import {
+  Users,
+  LogOut,
+  Search,
+  Filter,
+  BarChart3,
+  Download,
+  Upload,
+  Clock,
+} from "lucide-react";
+import { Input } from "../_components/ui/input";
+import {
+  authApi,
+  boardsApi,
+  socketClient,
+  type Card as ApiCard,
+} from "@/app/_lib/api";
 
 interface User {
-  name: string
-  emoji: string
-  color: string
+  name: string;
+  emoji: string;
+  color: string;
 }
 
 interface Comment {
-  id: string
-  author: User
-  content: string
-  timestamp: number
+  id: string;
+  author: User;
+  content: string;
+  timestamp: number;
 }
 
 interface Card {
-  id: string
-  content: string
-  author: User
-  column: string
-  priority: "high" | "medium" | "low"
-  likes: string[]
-  dislikes: string[]
-  comments: Comment[]
-  assignedTo?: User
-  timestamp: number
-  tags: string[]
+  id: string;
+  content: string;
+  author: User;
+  column: string;
+  priority: "low" | "normal" | "high" | "urgent";
+  likes: string[];
+  dislikes: string[];
+  comments: Comment[];
+  assignedTo?: User;
+  timestamp: number;
+  tags: string[];
 }
 
-const getStoredUser = (): User | null => {
-  if (typeof window === "undefined") return null
-
-  const stored = localStorage.getItem("wp-user")
-  if (!stored) return null
-
-  try {
-    return JSON.parse(stored) as User
-  } catch (error) {
-    console.error("Failed to parse stored user:", error)
-    return null
-  }
-}
-
-const getStoredCards = (): Card[] => {
-  if (typeof window === "undefined") return []
-
-  const stored = localStorage.getItem("wp-cards")
-  if (!stored) return []
-
-  try {
-    return JSON.parse(stored) as Card[]
-  } catch (error) {
-    console.error("Failed to parse stored cards:", error)
-    return []
-  }
-}
+const getCurrentUser = (): User => {
+  const user = authApi.getCurrentUser();
+  return {
+    name: user?.email?.split("@")[0] || "User",
+    emoji: "👤",
+    color: "#00AFF0",
+  };
+};
 
 const COLUMNS = [
   { id: "ideas", title: "Ideas", color: "wp-cyan" },
   { id: "discuss", title: "Discuss", color: "wp-magenta" },
   { id: "decided", title: "Decided", color: "wp-lime" },
-]
+];
 
 export default function BoardPage() {
-  const router = useRouter()
-  const [user, setUser] = useState<User | null>(null)
-  const [cards, setCards] = useState<Card[]>([])
-  const [searchQuery, setSearchQuery] = useState("")
-  const [filterPriority, setFilterPriority] = useState<"all" | "high" | "medium" | "low">("all")
-  const [filterUser, setFilterUser] = useState<string | "all">("all")
-  const [showStats, setShowStats] = useState(false)
-  const [showFilters, setShowFilters] = useState(false)
-  const [sessionTime, setSessionTime] = useState(0)
+  const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
+  const [boardId, setBoardId] = useState<string>("");
+  const [workspaceId, setWorkspaceId] = useState<string>("");
+  const [cards, setCards] = useState<Card[]>([]);
+  const [lanes, setLanes] = useState<{ id: string; name: string }[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [filterPriority, setFilterPriority] = useState<
+    "all" | "low" | "normal" | "high" | "urgent"
+  >("all");
+  const [filterUser, setFilterUser] = useState<string | "all">("all");
+  const [showStats, setShowStats] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [sessionTime, setSessionTime] = useState(0);
 
   useEffect(() => {
-    const storedUser = getStoredUser()
-    const storedCards = getStoredCards()
-    setUser(storedUser)
-    setCards(storedCards)
-
-    if (!storedUser) {
-      router.push("/")
-      return
-    }
-  }, [router])
-
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === "wp-user") {
-        setUser(getStoredUser())
-      }
-
-      if (event.key === "wp-cards") {
-        setCards(getStoredCards())
-      }
+    // Check authentication
+    const authenticated = authApi.isAuthenticated();
+    if (!authenticated) {
+      router.push("/login");
+      return;
     }
 
-    window.addEventListener("storage", handleStorageChange)
-    return () => window.removeEventListener("storage", handleStorageChange)
-  }, [])
+    // Get selected board from localStorage
+    const selectedBoard = localStorage.getItem("agora-selected-board");
+    const selectedWorkspace = localStorage.getItem("agora-selected-workspace");
 
-  useEffect(() => {
-    if (cards.length > 0) {
-      localStorage.setItem("wp-cards", JSON.stringify(cards))
+    if (!selectedBoard || !selectedWorkspace) {
+      router.push("/dashboard");
+      return;
     }
-  }, [cards])
+
+    setBoardId(selectedBoard);
+    setWorkspaceId(selectedWorkspace);
+    setUser(getCurrentUser());
+
+    // Load lanes first, then cards (to ensure proper mapping)
+    const initializeBoard = async () => {
+      await loadLanes(selectedBoard);
+      await loadCards(selectedBoard);
+    };
+    initializeBoard();
+
+    // Connect WebSocket
+    socketClient.connect({
+      boardId: selectedBoard,
+      workspaceId: selectedWorkspace,
+    });
+
+    // Listen to card events
+    socketClient.on("card:created", handleCardCreated);
+    socketClient.on("card:updated", handleCardUpdated);
+    socketClient.on("card:moved", handleCardMoved);
+
+    return () => {
+      socketClient.disconnect();
+    };
+  }, [router]);
+
+  const loadLanes = async (boardId: string) => {
+    try {
+      const lanesData = await boardsApi.getLanes(boardId);
+      setLanes(lanesData.map((lane) => ({ id: lane.id, name: lane.name })));
+      console.log("✅ Lanes loaded:", lanesData);
+    } catch (error) {
+      console.error("Failed to load lanes:", error);
+    }
+  };
+
+  const loadCards = async (boardId: string) => {
+    try {
+      setLoading(true);
+      const apiCards = await boardsApi.listCards(boardId);
+
+      // Get current lanes from state
+      setLanes((currentLanes) => {
+        console.log("📥 Loading cards:", {
+          count: apiCards.length,
+          lanesAvailable: currentLanes.length,
+          lanes: currentLanes,
+        });
+
+        // Transform API cards to UI cards using current lanes
+        const uiCards: Card[] = apiCards.map((apiCard) => {
+          const column = mapLaneToColumnWithLanes(apiCard.laneId, currentLanes);
+          console.log("🗺️ Mapping card:", {
+            cardId: apiCard.id,
+            laneId: apiCard.laneId,
+            mappedColumn: column,
+          });
+          return {
+            id: apiCard.id,
+            content: apiCard.content,
+            author: getCurrentUser(), // TODO: Get from authors API when available
+            column,
+            priority: apiCard.priority, // Use backend priority directly
+            likes: [],
+            dislikes: [],
+            comments: [],
+            timestamp: new Date(apiCard.createdAt).getTime(),
+            tags: [],
+          };
+        });
+
+        console.log("✅ Cards loaded and mapped:", uiCards.length);
+        setCards(uiCards);
+
+        return currentLanes; // Return unchanged lanes
+      });
+    } catch (error) {
+      console.error("❌ Failed to load cards:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const mapLaneToColumnWithLanes = (
+    laneId: string | null,
+    lanesArray: { id: string; name: string }[]
+  ): string => {
+    if (!laneId || lanesArray.length === 0) {
+      console.warn("⚠️ mapLaneToColumn: No laneId or lanes empty", {
+        laneId,
+        lanesCount: lanesArray.length,
+      });
+      return "ideas"; // Default
+    }
+
+    const lane = lanesArray.find((l) => l.id === laneId);
+    if (!lane) {
+      console.warn("⚠️ mapLaneToColumn: Lane not found", {
+        laneId,
+        availableLanes: lanesArray,
+      });
+      return "ideas"; // Default if lane not found
+    }
+
+    // Map lane name to column ID
+    console.log("✅ mapLaneToColumn:", { laneId, laneName: lane.name });
+    return lane.name; // lanes are created with names: "ideas", "discuss", "decided"
+  };
+
+  const mapColumnToLaneId = (columnName: string): string | undefined => {
+    const lane = lanes.find((l) => l.name === columnName);
+    console.log("🗺️ mapColumnToLaneId:", {
+      columnName,
+      laneId: lane?.id,
+      allLanes: lanes,
+    });
+    return lane?.id;
+  };
+
+  const handleCardCreated = (payload: any) => {
+    console.log("Card created event:", payload);
+    // Reload cards when a new card is created
+    if (boardId) {
+      loadCards(boardId);
+    }
+  };
+
+  const handleCardUpdated = (payload: any) => {
+    console.log("Card updated event:", payload);
+    // Reload cards when a card is updated
+    if (boardId) {
+      loadCards(boardId);
+    }
+  };
+
+  const handleCardMoved = (payload: any) => {
+    console.log("Card moved event:", payload);
+    // Reload cards when a card is moved
+    if (boardId) {
+      // Force reload lanes first to ensure proper mapping
+      loadLanes(boardId).then(() => {
+        loadCards(boardId);
+      });
+    }
+  };
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setSessionTime((prev) => prev + 1)
-    }, 1000)
-    return () => clearInterval(interval)
-  }, [])
+      setSessionTime((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
-  const handleAddCard = (columnId: string, content: string, priority: "high" | "medium" | "low") => {
-    if (!user) return
+  const handleAddCard = async (
+    columnId: string,
+    content: string,
+    priority: "low" | "normal" | "high" | "urgent"
+  ) => {
+    if (!user || !boardId) return;
 
-    const newCard: Card = {
-      id: Date.now().toString(),
-      content,
-      author: user,
-      column: columnId,
-      priority,
-      likes: [],
-      dislikes: [],
-      comments: [],
-      timestamp: Date.now(),
-      tags: [],
+    try {
+      // Map column to laneId
+      const laneId = mapColumnToLaneId(columnId);
+
+      if (!laneId) {
+        console.error("❌ Cannot find lane ID for column:", columnId);
+        return;
+      }
+
+      console.log("📝 Creating card:", { columnId, laneId, content, priority });
+
+      await boardsApi.createCard(boardId, {
+        content,
+        priority,
+        position: 1000,
+        laneId, // Important: Set the lane when creating
+      });
+
+      console.log("✅ Card created in lane:", laneId);
+
+      // Cards will be reloaded via WebSocket event
+    } catch (error) {
+      console.error("❌ Failed to create card:", error);
     }
+  };
 
-    setCards([...cards, newCard])
-  }
+  const handleMoveCard = async (cardId: string, newColumn: string) => {
+    if (!boardId) return;
 
-  const handleMoveCard = (cardId: string, newColumn: string) => {
-    setCards(cards.map((card) => (card.id === cardId ? { ...card, column: newColumn } : card)))
-  }
+    console.log("🔄 Moving card:", {
+      cardId,
+      newColumn,
+      lanesAvailable: lanes.length,
+    });
 
-  const handleDeleteCard = (cardId: string) => {
-    setCards(cards.filter((card) => card.id !== cardId))
-  }
+    // Update local state optimistically
+    const updatedCards = cards.map((card) =>
+      card.id === cardId ? { ...card, column: newColumn } : card
+    );
+    setCards(updatedCards);
+
+    try {
+      // Map column to laneId
+      const laneId = mapColumnToLaneId(newColumn);
+
+      console.log("🗺️ Lane mapping:", { newColumn, laneId, allLanes: lanes });
+
+      if (!laneId) {
+        console.error("❌ Cannot find lane ID for column:", newColumn);
+        setCards(cards); // Revert
+        return;
+      }
+
+      await boardsApi.updateCard(boardId, cardId, {
+        laneId: laneId,
+      });
+
+      console.log(`✅ Card ${cardId} moved to ${newColumn} (lane: ${laneId})`);
+    } catch (error) {
+      console.error("❌ Failed to move card:", error);
+      // Revert optimistic update on error
+      setCards(cards);
+    }
+  };
+
+  const handleDeleteCard = async (cardId: string) => {
+    if (!boardId) return;
+
+    // Update local state optimistically
+    const updatedCards = cards.filter((card) => card.id !== cardId);
+    setCards(updatedCards);
+
+    try {
+      await boardsApi.archiveCard(boardId, cardId);
+      console.log(`✅ Card ${cardId} archived`);
+    } catch (error) {
+      console.error("Failed to archive card:", error);
+      // Revert optimistic update on error
+      setCards(cards);
+    }
+  };
 
   const handleVote = (cardId: string, type: "like" | "dislike") => {
-    if (!user) return
+    if (!user) return;
 
     setCards(
       cards.map((card) => {
-        if (card.id !== cardId) return card
+        if (card.id !== cardId) return card;
 
-        const newCard = { ...card }
+        const newCard = { ...card };
 
         if (type === "like") {
           if (newCard.likes.includes(user.name)) {
-            newCard.likes = newCard.likes.filter((name) => name !== user.name)
+            newCard.likes = newCard.likes.filter((name) => name !== user.name);
           } else {
-            newCard.likes = [...newCard.likes, user.name]
-            newCard.dislikes = newCard.dislikes.filter((name) => name !== user.name)
+            newCard.likes = [...newCard.likes, user.name];
+            newCard.dislikes = newCard.dislikes.filter(
+              (name) => name !== user.name
+            );
           }
         } else {
           if (newCard.dislikes.includes(user.name)) {
-            newCard.dislikes = newCard.dislikes.filter((name) => name !== user.name)
+            newCard.dislikes = newCard.dislikes.filter(
+              (name) => name !== user.name
+            );
           } else {
-            newCard.dislikes = [...newCard.dislikes, user.name]
-            newCard.likes = newCard.likes.filter((name) => name !== user.name)
+            newCard.dislikes = [...newCard.dislikes, user.name];
+            newCard.likes = newCard.likes.filter((name) => name !== user.name);
           }
         }
 
-        return newCard
-      }),
-    )
-  }
+        return newCard;
+      })
+    );
+  };
 
   const handleAddComment = (cardId: string, content: string) => {
-    if (!user) return
+    if (!user) return;
 
     setCards(
       cards.map((card) => {
-        if (card.id !== cardId) return card
+        if (card.id !== cardId) return card;
 
         const newComment: Comment = {
           id: Date.now().toString(),
           author: user,
           content,
           timestamp: Date.now(),
-        }
+        };
 
         return {
           ...card,
           comments: [...card.comments, newComment],
-        }
-      }),
-    )
-  }
+        };
+      })
+    );
+  };
 
-  const handleChangePriority = (cardId: string, priority: "high" | "medium" | "low") => {
-    setCards(cards.map((card) => (card.id === cardId ? { ...card, priority } : card)))
-  }
+  const handleChangePriority = (
+    cardId: string,
+    priority: "low" | "normal" | "high" | "urgent"
+  ) => {
+    setCards(
+      cards.map((card) => (card.id === cardId ? { ...card, priority } : card))
+    );
+  };
 
   const handleAssignUser = (cardId: string, assignedUser: User | undefined) => {
-    setCards(cards.map((card) => (card.id === cardId ? { ...card, assignedTo: assignedUser } : card)))
-  }
+    setCards(
+      cards.map((card) =>
+        card.id === cardId ? { ...card, assignedTo: assignedUser } : card
+      )
+    );
+  };
 
   const handleAddTag = (cardId: string, tag: string) => {
     setCards(
       cards.map((card) => {
-        if (card.id !== cardId) return card
-        if (card.tags.includes(tag)) return card
-        return { ...card, tags: [...card.tags, tag] }
-      }),
-    )
-  }
+        if (card.id !== cardId) return card;
+        if (card.tags.includes(tag)) return card;
+        return { ...card, tags: [...card.tags, tag] };
+      })
+    );
+  };
 
   const handleRemoveTag = (cardId: string, tag: string) => {
     setCards(
       cards.map((card) => {
-        if (card.id !== cardId) return card
-        return { ...card, tags: card.tags.filter((t) => t !== tag) }
-      }),
-    )
-  }
+        if (card.id !== cardId) return card;
+        return { ...card, tags: card.tags.filter((t) => t !== tag) };
+      })
+    );
+  };
 
   const handleExport = () => {
     const data = {
       cards,
       exportDate: new Date().toISOString(),
       user: user?.name,
-    }
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `decision-board-${Date.now()}.json`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `decision-board-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-    const reader = new FileReader()
+    const reader = new FileReader();
     reader.onload = (event) => {
       try {
-        const data = JSON.parse(event.target?.result as string)
+        const data = JSON.parse(event.target?.result as string);
         if (data.cards) {
-          setCards(data.cards)
+          setCards(data.cards);
         }
       } catch (error) {
-        console.error("Failed to import data:", error)
+        console.error("Failed to import data:", error);
       }
-    }
-    reader.readAsText(file)
-  }
+    };
+    reader.readAsText(file);
+  };
 
   const filteredCards = cards.filter((card) => {
     const matchesSearch =
       searchQuery === "" ||
       card.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
       card.author.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      card.tags.some((tag) => tag.toLowerCase().includes(searchQuery.toLowerCase()))
+      card.tags.some((tag) =>
+        tag.toLowerCase().includes(searchQuery.toLowerCase())
+      );
 
-    const matchesPriority = filterPriority === "all" || card.priority === filterPriority
+    const matchesPriority =
+      filterPriority === "all" || card.priority === filterPriority;
 
-    const matchesUser = filterUser === "all" || card.author.name === filterUser || card.assignedTo?.name === filterUser
+    const matchesUser =
+      filterUser === "all" ||
+      card.author.name === filterUser ||
+      card.assignedTo?.name === filterUser;
 
-    return matchesSearch && matchesPriority && matchesUser
-  })
+    return matchesSearch && matchesPriority && matchesUser;
+  });
 
-  const activeUsers = user ? [user] : []
+  const activeUsers = user ? [user] : [];
 
   const stats = {
     total: cards.length,
     ideas: cards.filter((c) => c.column === "ideas").length,
     discuss: cards.filter((c) => c.column === "discuss").length,
     decided: cards.filter((c) => c.column === "decided").length,
+    urgent: cards.filter((c) => c.priority === "urgent").length,
     high: cards.filter((c) => c.priority === "high").length,
-    medium: cards.filter((c) => c.priority === "medium").length,
+    normal: cards.filter((c) => c.priority === "normal").length,
     low: cards.filter((c) => c.priority === "low").length,
     totalLikes: cards.reduce((sum, c) => sum + c.likes.length, 0),
     totalComments: cards.reduce((sum, c) => sum + c.comments.length, 0),
-  }
+  };
 
   const formatSessionTime = (seconds: number) => {
-    const hours = Math.floor(seconds / 3600)
-    const minutes = Math.floor((seconds % 3600) / 60)
-    const secs = seconds % 60
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const handleLogout = async () => {
+    await authApi.logout();
+    router.push("/login");
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#1e1e1e]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#00AFF0] border-t-transparent animate-spin mx-auto mb-4"></div>
+          <p className="text-white/60 uppercase text-xs tracking-wider">
+            Loading board...
+          </p>
+        </div>
+      </div>
+    );
   }
 
-  if (!user) return null
+  if (!user) return null;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <header className="bg-[#1a1a1a] border-b-2 border-[#333333]">
         <div className="container mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-semibold tracking-tight text-white">decision board</h1>
+            <h1 className="text-2xl font-semibold tracking-tight text-white">
+              decision board
+            </h1>
             <div className="flex items-center gap-2 px-4 py-2 bg-[#2d2d2d]">
               <Users className="w-4 h-4 text-white" />
-              <span className="text-sm font-semibold text-white">{activeUsers.length}</span>
+              <span className="text-sm font-semibold text-white">
+                {activeUsers.length}
+              </span>
             </div>
             <div className="flex items-center gap-2 px-4 py-2 bg-[#2d2d2d]">
               <Clock className="w-4 h-4 text-[#00AFF0]" />
-              <span className="text-sm font-semibold text-white">{formatSessionTime(sessionTime)}</span>
+              <span className="text-sm font-semibold text-white">
+                {formatSessionTime(sessionTime)}
+              </span>
             </div>
           </div>
 
@@ -317,7 +559,10 @@ export default function BoardPage() {
             <div className="flex items-center gap-3 px-4 py-2 bg-[#2d2d2d]">
               <span className="text-2xl">{user.emoji}</span>
               <span className="font-semibold text-white">{user.name}</span>
-              <div className="w-4 h-4" style={{ backgroundColor: user.color }} />
+              <div
+                className="w-4 h-4"
+                style={{ backgroundColor: user.color }}
+              />
             </div>
 
             <button
@@ -347,7 +592,9 @@ export default function BoardPage() {
             <button
               onClick={() => setShowFilters(!showFilters)}
               className={`h-10 px-4 font-semibold flex items-center gap-2 transition-colors ${
-                showFilters ? "bg-[#00AFF0] text-white" : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
+                showFilters
+                  ? "bg-[#00AFF0] text-white"
+                  : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
               }`}
             >
               <Filter className="w-4 h-4" />
@@ -357,7 +604,9 @@ export default function BoardPage() {
             <button
               onClick={() => setShowStats(!showStats)}
               className={`h-10 px-4 font-semibold flex items-center gap-2 transition-colors ${
-                showStats ? "bg-[#00AFF0] text-white" : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
+                showStats
+                  ? "bg-[#00AFF0] text-white"
+                  : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
               }`}
             >
               <BarChart3 className="w-4 h-4" />
@@ -375,35 +624,48 @@ export default function BoardPage() {
             <label className="h-10 px-4 bg-[#2d2d2d] text-white hover:bg-[#3d3d3d] font-semibold flex items-center gap-2 transition-colors cursor-pointer">
               <Upload className="w-4 h-4" />
               import
-              <input type="file" accept=".json" onChange={handleImport} className="hidden" />
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImport}
+                className="hidden"
+              />
             </label>
           </div>
 
           {showFilters && (
             <div className="mt-3 pt-3 border-t-2 border-[#333333] flex items-center gap-3 flex-wrap">
-              <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">priority:</span>
+              <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">
+                priority:
+              </span>
               <div className="flex gap-2">
-                {(["all", "high", "medium", "low"] as const).map((priority) => (
-                  <button
-                    key={priority}
-                    onClick={() => setFilterPriority(priority)}
-                    className={`h-8 px-3 font-semibold text-sm transition-colors ${
-                      filterPriority === priority
-                        ? "bg-[#00AFF0] text-white"
-                        : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
-                    }`}
-                  >
-                    {priority}
-                  </button>
-                ))}
+                {(["all", "urgent", "high", "normal", "low"] as const).map(
+                  (priority) => (
+                    <button
+                      key={priority}
+                      onClick={() => setFilterPriority(priority)}
+                      className={`h-8 px-3 font-semibold text-sm transition-colors ${
+                        filterPriority === priority
+                          ? "bg-[#00AFF0] text-white"
+                          : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
+                      }`}
+                    >
+                      {priority}
+                    </button>
+                  )
+                )}
               </div>
 
-              <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider ml-4">user:</span>
+              <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider ml-4">
+                user:
+              </span>
               <div className="flex gap-2">
                 <button
                   onClick={() => setFilterUser("all")}
                   className={`h-8 px-3 font-semibold text-sm transition-colors ${
-                    filterUser === "all" ? "bg-[#00AFF0] text-white" : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
+                    filterUser === "all"
+                      ? "bg-[#00AFF0] text-white"
+                      : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
                   }`}
                 >
                   all
@@ -413,7 +675,9 @@ export default function BoardPage() {
                     key={u.name}
                     onClick={() => setFilterUser(u.name)}
                     className={`h-8 px-3 font-semibold text-sm flex items-center gap-2 transition-colors ${
-                      filterUser === u.name ? "bg-[#00AFF0] text-white" : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
+                      filterUser === u.name
+                        ? "bg-[#00AFF0] text-white"
+                        : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
                     }`}
                   >
                     <span>{u.emoji}</span>
@@ -428,36 +692,84 @@ export default function BoardPage() {
             <div className="mt-3 pt-3 border-t-2 border-[#333333]">
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
                 <div className="bg-[#2d2d2d] p-3">
-                  <div className="text-2xl font-bold text-white">{stats.total}</div>
-                  <div className="text-xs text-[#999999] uppercase tracking-wider">total cards</div>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.total}
+                  </div>
+                  <div className="text-xs text-[#999999] uppercase tracking-wider">
+                    total cards
+                  </div>
                 </div>
                 <div className="bg-[#00AFF0] p-3">
-                  <div className="text-2xl font-bold text-white">{stats.ideas}</div>
-                  <div className="text-xs text-white uppercase tracking-wider">ideas</div>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.ideas}
+                  </div>
+                  <div className="text-xs text-white uppercase tracking-wider">
+                    ideas
+                  </div>
                 </div>
                 <div className="bg-[#E3008C] p-3">
-                  <div className="text-2xl font-bold text-white">{stats.discuss}</div>
-                  <div className="text-xs text-white uppercase tracking-wider">discuss</div>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.discuss}
+                  </div>
+                  <div className="text-xs text-white uppercase tracking-wider">
+                    discuss
+                  </div>
                 </div>
                 <div className="bg-[#8CBF26] p-3">
-                  <div className="text-2xl font-bold text-white">{stats.decided}</div>
-                  <div className="text-xs text-white uppercase tracking-wider">decided</div>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.decided}
+                  </div>
+                  <div className="text-xs text-white uppercase tracking-wider">
+                    decided
+                  </div>
                 </div>
                 <div className="bg-[#e81123] p-3">
-                  <div className="text-2xl font-bold text-white">{stats.high}</div>
-                  <div className="text-xs text-white uppercase tracking-wider">high priority</div>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.urgent}
+                  </div>
+                  <div className="text-xs text-white uppercase tracking-wider">
+                    urgent
+                  </div>
                 </div>
                 <div className="bg-[#FA6800] p-3">
-                  <div className="text-2xl font-bold text-white">{stats.medium}</div>
-                  <div className="text-xs text-white uppercase tracking-wider">medium</div>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.high}
+                  </div>
+                  <div className="text-xs text-white uppercase tracking-wider">
+                    high priority
+                  </div>
+                </div>
+                <div className="bg-[#00AFF0] p-3">
+                  <div className="text-2xl font-bold text-white">
+                    {stats.normal}
+                  </div>
+                  <div className="text-xs text-white uppercase tracking-wider">
+                    normal
+                  </div>
+                </div>
+                <div className="bg-[#8CBF26] p-3">
+                  <div className="text-2xl font-bold text-white">
+                    {stats.low}
+                  </div>
+                  <div className="text-xs text-white uppercase tracking-wider">
+                    low
+                  </div>
                 </div>
                 <div className="bg-[#2d2d2d] p-3">
-                  <div className="text-2xl font-bold text-white">{stats.totalLikes}</div>
-                  <div className="text-xs text-[#999999] uppercase tracking-wider">total votes</div>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.totalLikes}
+                  </div>
+                  <div className="text-xs text-[#999999] uppercase tracking-wider">
+                    total votes
+                  </div>
                 </div>
                 <div className="bg-[#2d2d2d] p-3">
-                  <div className="text-2xl font-bold text-white">{stats.totalComments}</div>
-                  <div className="text-xs text-[#999999] uppercase tracking-wider">comments</div>
+                  <div className="text-2xl font-bold text-white">
+                    {stats.totalComments}
+                  </div>
+                  <div className="text-xs text-[#999999] uppercase tracking-wider">
+                    comments
+                  </div>
                 </div>
               </div>
             </div>
@@ -468,13 +780,23 @@ export default function BoardPage() {
       <div className="bg-[#1a1a1a] border-b-2 border-[#333333]">
         <div className="container mx-auto px-6 py-3">
           <div className="flex items-center gap-4">
-            <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">active now</span>
+            <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">
+              active now
+            </span>
             <div className="flex gap-2">
               {activeUsers.map((u, i) => (
-                <div key={i} className="flex items-center gap-2 px-3 py-1.5 bg-[#2d2d2d]">
+                <div
+                  key={i}
+                  className="flex items-center gap-2 px-3 py-1.5 bg-[#2d2d2d]"
+                >
                   <span className="text-lg">{u.emoji}</span>
-                  <span className="text-sm font-medium text-white">{u.name}</span>
-                  <div className="w-3 h-3" style={{ backgroundColor: u.color }} />
+                  <span className="text-sm font-medium text-white">
+                    {u.name}
+                  </span>
+                  <div
+                    className="w-3 h-3"
+                    style={{ backgroundColor: u.color }}
+                  />
                 </div>
               ))}
             </div>
@@ -505,5 +827,5 @@ export default function BoardPage() {
         </div>
       </main>
     </div>
-  )
+  );
 }

@@ -1,44 +1,33 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { authApi } from "@/app/_lib/api";
 
 export default function LoginPage() {
-  const router = useRouter()
-  const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
-  const [error, setError] = useState("")
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
-    e.preventDefault()
-    setError("")
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
 
-    // Get stored users
-    const usersData = localStorage.getItem("wp-users")
-    const users = usersData ? JSON.parse(usersData) : []
-
-    // Find user
-    const user = users.find((u: any) => u.email === email && u.password === password)
-
-    if (user) {
-      // Store current user session
-      localStorage.setItem(
-        "wp-user",
-        JSON.stringify({
-          name: user.name,
-          emoji: user.emoji,
-          color: user.color,
-          email: user.email,
-        }),
-      )
-      router.push("/board")
-    } else {
-      setError("invalid credentials")
+    try {
+      await authApi.login({ email, password });
+      router.push("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "invalid credentials");
+    } finally {
+      setLoading(false);
     }
-  }
+  };
 
   return (
     <main className="min-h-screen flex items-center justify-center p-4 bg-[#1e1e1e]">
@@ -46,14 +35,18 @@ export default function LoginPage() {
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-5xl font-light text-white mb-2">hello</h1>
-          <p className="text-white/60 uppercase text-xs tracking-wider">SIGN IN TO CONTINUE</p>
+          <p className="text-white/60 uppercase text-xs tracking-wider">
+            SIGN IN TO CONTINUE
+          </p>
         </div>
 
         {/* Login Form */}
         <form onSubmit={handleLogin} className="space-y-0">
           {/* Email Tile */}
           <div className="bg-[#0078D7] p-6 mb-1">
-            <label className="block text-white/80 uppercase text-xs tracking-wider mb-3">EMAIL</label>
+            <label className="block text-white/80 uppercase text-xs tracking-wider mb-3">
+              EMAIL
+            </label>
             <input
               type="email"
               value={email}
@@ -66,7 +59,9 @@ export default function LoginPage() {
 
           {/* Password Tile */}
           <div className="bg-[#00AFF0] p-6 mb-1">
-            <label className="block text-white/80 uppercase text-xs tracking-wider mb-3">PASSWORD</label>
+            <label className="block text-white/80 uppercase text-xs tracking-wider mb-3">
+              PASSWORD
+            </label>
             <input
               type="password"
               value={password}
@@ -80,7 +75,9 @@ export default function LoginPage() {
           {/* Error Message */}
           {error && (
             <div className="bg-[#E3008C] p-4 mb-1">
-              <p className="text-white text-sm uppercase tracking-wider">{error}</p>
+              <p className="text-white text-sm uppercase tracking-wider">
+                {error}
+              </p>
             </div>
           )}
 
@@ -88,9 +85,10 @@ export default function LoginPage() {
           <div className="grid grid-cols-2 gap-1 mt-1">
             <button
               type="submit"
-              className="bg-[#8CBF26] p-6 text-white font-light text-xl hover:bg-[#7AA622] transition-colors"
+              disabled={loading}
+              className="bg-[#8CBF26] p-6 text-white font-light text-xl hover:bg-[#7AA622] disabled:bg-[#666666] disabled:cursor-not-allowed transition-colors"
             >
-              sign in
+              {loading ? "signing in..." : "sign in"}
             </button>
             <Link
               href="/register"
@@ -104,15 +102,19 @@ export default function LoginPage() {
         {/* Info Tiles */}
         <div className="grid grid-cols-2 gap-1 mt-1">
           <div className="bg-[#A200FF] p-4">
-            <p className="text-white/80 text-xs uppercase tracking-wider">COLLABORATIVE</p>
+            <p className="text-white/80 text-xs uppercase tracking-wider">
+              COLLABORATIVE
+            </p>
             <p className="text-white text-sm font-light">decision platform</p>
           </div>
           <div className="bg-[#E3008C] p-4">
-            <p className="text-white/80 text-xs uppercase tracking-wider">REAL-TIME</p>
+            <p className="text-white/80 text-xs uppercase tracking-wider">
+              REAL-TIME
+            </p>
             <p className="text-white text-sm font-light">teamwork</p>
           </div>
         </div>
       </div>
     </main>
-  )
+  );
 }
