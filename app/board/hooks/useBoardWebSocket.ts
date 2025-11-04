@@ -75,7 +75,7 @@ export const useBoardWebSocket = ({
 
     const handleCardUpdated = async (payload: any) => {
       console.log("🔔 Card updated event:", payload);
-      
+
       // For updates from other users, reload to get the latest data
       // This is simpler than trying to merge partial updates
       if (boardId) {
@@ -85,26 +85,30 @@ export const useBoardWebSocket = ({
 
     const handleCardMoved = async (payload: any) => {
       console.log("🔔 Card moved event:", payload);
-      
+
       const { cardId, targetLaneId, userId } = payload;
-      
+
       const currentUserId = authApi.getCurrentUser()?.id;
       if (userId === currentUserId) {
-        console.log("✅ Card moved by current user (optimistic update already applied)");
+        console.log(
+          "✅ Card moved by current user (optimistic update already applied)"
+        );
         return;
       }
-      
+
       // Map lane ID to column name using the utility
       const targetColumn = mapLaneToColumn(targetLaneId, lanes);
-      
+
       // Update card position for moves from other users
       setCards((prevCards) =>
         prevCards.map((card) =>
           card.id === cardId ? { ...card, column: targetColumn } : card
         )
       );
-      
-      console.log(`✅ Card ${cardId} moved to column ${targetColumn} by another user`);
+
+      console.log(
+        `✅ Card ${cardId} moved to column ${targetColumn} by another user`
+      );
     };
 
     const handleCommentCreated = async (payload: any) => {

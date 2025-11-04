@@ -29,7 +29,11 @@ export const mapLaneToColumn = (
 
   // Map lane name to column ID (normalize to lowercase)
   const columnName = lane.name.toLowerCase();
-  console.log("✅ mapLaneToColumn:", { laneId, laneName: lane.name, columnName });
+  console.log("✅ mapLaneToColumn:", {
+    laneId,
+    laneName: lane.name,
+    columnName,
+  });
   return columnName;
 };
 
