@@ -16,6 +16,7 @@ export { boardsApi } from "./boards";
 export type { Board, CreateBoardDto } from "./boards";
 export { tagsApi } from "./tags";
 export { assigneesApi } from "./assignees";
+export { commentsApi } from "./comments";
 export { workspacesApi } from "./workspaces";
 export type { Workspace, CreateWorkspaceDto } from "./workspaces";
 export { sessionsApi } from "./sessions";

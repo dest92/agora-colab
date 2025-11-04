@@ -20,6 +20,7 @@ import {
   authApi,
   boardsApi,
   socketClient,
+  commentsApi,
   type Card as ApiCard,
 } from "@/app/_lib/api";
 import { usersApi } from "@/app/_lib/api/users";
@@ -142,18 +143,37 @@ export default function BoardPage() {
       userId: currentUserId || undefined,
     });
 
+    return () => {
+      socketClient.disconnect();
+    };
+  }, [router]);
+
+  // Register WebSocket event listeners (separate useEffect to ensure handlers are defined)
+  useEffect(() => {
+    if (!boardId) return;
+
+    console.log("🔌 Registering WebSocket event listeners");
+
     // Listen to card events
     socketClient.on("card:created", handleCardCreated);
     socketClient.on("card:updated", handleCardUpdated);
     socketClient.on("card:moved", handleCardMoved);
 
+    // Listen to comment events
+    socketClient.on("comment:created", handleCommentCreated);
+
     // Listen to presence events
     socketClient.on("presence:update", handlePresenceUpdate);
 
     return () => {
-      socketClient.disconnect();
+      console.log("🔌 Unregistering WebSocket event listeners");
+      socketClient.off("card:created", handleCardCreated);
+      socketClient.off("card:updated", handleCardUpdated);
+      socketClient.off("card:moved", handleCardMoved);
+      socketClient.off("comment:created", handleCommentCreated);
+      socketClient.off("presence:update", handlePresenceUpdate);
     };
-  }, [router]);
+  }, [boardId, cards, lanes]); // Re-register when dependencies change
 
   const loadLanes = async (boardId: string) => {
     try {
@@ -205,6 +225,44 @@ export default function BoardPage() {
             authorName = await getUserDisplayName(apiCard.authorId);
           }
 
+          // Load comments for this card
+          let comments: Comment[] = [];
+          try {
+            const apiComments = await commentsApi.listComments(
+              boardId,
+              apiCard.id
+            );
+            comments = await Promise.all(
+              apiComments.map(async (comment) => {
+                const isCommentAuthorCurrentUser =
+                  comment.authorId === currentUserId;
+                let commentAuthorName = "You";
+                if (!isCommentAuthorCurrentUser) {
+                  commentAuthorName = await getUserDisplayName(
+                    comment.authorId
+                  );
+                }
+
+                return {
+                  id: comment.id,
+                  author: {
+                    name: commentAuthorName,
+                    email: comment.authorId,
+                    emoji: isCommentAuthorCurrentUser ? "👤" : "👥",
+                    color: isCommentAuthorCurrentUser ? "#00AFF0" : "#999999",
+                  },
+                  content: comment.content,
+                  timestamp: new Date(comment.createdAt).getTime(),
+                };
+              })
+            );
+          } catch (error) {
+            console.error(
+              `❌ Failed to load comments for card ${apiCard.id}:`,
+              error
+            );
+          }
+
           return {
             id: apiCard.id,
             content: apiCard.content,
@@ -218,7 +276,7 @@ export default function BoardPage() {
             priority: apiCard.priority, // Use backend priority directly
             likes: [],
             dislikes: [],
-            comments: [],
+            comments,
             timestamp: new Date(apiCard.createdAt).getTime(),
             tags: [],
           };
@@ -303,6 +361,48 @@ export default function BoardPage() {
       // Force reload lanes first to ensure proper mapping
       const loadedLanes = await loadLanes(boardId);
       await loadCards(boardId, loadedLanes);
+    }
+  };
+
+  const handleCommentCreated = async (payload: any) => {
+    console.log("🔔 Comment created event:", payload);
+
+    const { commentId, cardId, authorId, content, createdAt } = payload;
+
+    // Check if comment is from current user (optimistic update already done)
+    const currentUserId = authApi.getCurrentUser()?.id;
+    if (authorId === currentUserId) {
+      console.log("✅ Comment already in UI (optimistic update)");
+      return;
+    }
+
+    // Add comment from another user to the local state
+    try {
+      const commentAuthorName = await getUserDisplayName(authorId);
+
+      const newComment: Comment = {
+        id: commentId,
+        author: {
+          name: commentAuthorName,
+          emoji: "👥",
+          color: "#999999",
+        },
+        content,
+        timestamp: new Date(createdAt).getTime(),
+      };
+
+      setCards(
+        cards.map((card) => {
+          if (card.id === cardId) {
+            return { ...card, comments: [...card.comments, newComment] };
+          }
+          return card;
+        })
+      );
+
+      console.log("✅ Comment added from another user");
+    } catch (error) {
+      console.error("❌ Failed to add comment:", error);
     }
   };
 
@@ -468,26 +568,39 @@ export default function BoardPage() {
     );
   };
 
-  const handleAddComment = (cardId: string, content: string) => {
-    if (!user) return;
+  const handleAddComment = async (cardId: string, content: string) => {
+    if (!user || !boardId) return;
 
-    setCards(
-      cards.map((card) => {
-        if (card.id !== cardId) return card;
+    try {
+      // Call backend API to create comment
+      const newComment = await commentsApi.createComment(boardId, cardId, {
+        content,
+      });
 
-        const newComment: Comment = {
-          id: Date.now().toString(),
-          author: user,
-          content,
-          timestamp: Date.now(),
-        };
+      // Update local state with the new comment
+      setCards(
+        cards.map((card) => {
+          if (card.id !== cardId) return card;
 
-        return {
-          ...card,
-          comments: [...card.comments, newComment],
-        };
-      })
-    );
+          const commentWithLocalFormat: Comment = {
+            id: newComment.id,
+            author: user, // Use current user
+            content: newComment.content,
+            timestamp: new Date(newComment.createdAt).getTime(),
+          };
+
+          return {
+            ...card,
+            comments: [...card.comments, commentWithLocalFormat],
+          };
+        })
+      );
+
+      console.log("✅ Comment created:", newComment);
+    } catch (error) {
+      console.error("❌ Failed to create comment:", error);
+      // Optionally show error to user
+    }
   };
 
   const handleChangePriority = (
