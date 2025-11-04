@@ -27,17 +27,20 @@ export const getUserInfo = async (userId: string): Promise<UserInfo> => {
 
   try {
     const user = await usersApi.getUser(userId);
-    const displayName = user.user_metadata?.name || user.email?.split("@")[0] || userId.substring(0, 8);
+    const displayName =
+      user.user_metadata?.name ||
+      user.email?.split("@")[0] ||
+      userId.substring(0, 8);
     const emoji = user.user_metadata?.emoji || "👤";
     const color = user.user_metadata?.color || "#999999";
-    
+
     const userInfo: UserInfo = {
       name: displayName,
       emoji,
       color,
-      email: user.email
+      email: user.email,
     };
-    
+
     userCache.set(userId, userInfo);
     return userInfo;
   } catch (error) {
@@ -46,7 +49,7 @@ export const getUserInfo = async (userId: string): Promise<UserInfo> => {
       name: userId.substring(0, 8) + "...",
       emoji: "👤",
       color: "#999999",
-      email: ""
+      email: "",
     };
   }
 };

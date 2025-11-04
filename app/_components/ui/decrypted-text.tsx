@@ -55,9 +55,7 @@ export default function DecryptedText({
           const middle = Math.floor(textLength / 2);
           const offset = Math.floor(revealedSet.size / 2);
           const nextIndex =
-            revealedSet.size % 2 === 0
-              ? middle + offset
-              : middle - offset - 1;
+            revealedSet.size % 2 === 0 ? middle + offset : middle - offset - 1;
 
           if (
             nextIndex >= 0 &&

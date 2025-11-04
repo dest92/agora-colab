@@ -101,7 +101,7 @@ export const useBoardData = () => {
               ...authorInfo,
               name: "You",
               emoji: "👤",
-              color: "#00AFF0"
+              color: "#00AFF0",
             };
           }
 
@@ -116,14 +116,14 @@ export const useBoardData = () => {
               apiComments.map(async (comment) => {
                 const isCommentAuthorCurrentUser =
                   comment.authorId === currentUserId;
-                
+
                 let commentAuthorInfo = await getUserInfo(comment.authorId);
                 if (isCommentAuthorCurrentUser) {
                   commentAuthorInfo = {
                     ...commentAuthorInfo,
                     name: "You",
                     emoji: "👤",
-                    color: "#00AFF0"
+                    color: "#00AFF0",
                   };
                 }
 
@@ -192,14 +192,14 @@ export const useBoardData = () => {
             if (assignees.length > 0) {
               const assignee = assignees[0];
               const isAssigneeCurrentUser = assignee.userId === currentUserId;
-              
+
               let assigneeInfo = await getUserInfo(assignee.userId);
               if (isAssigneeCurrentUser) {
                 assigneeInfo = {
                   ...assigneeInfo,
                   name: "You",
                   emoji: "👤",
-                  color: "#00AFF0"
+                  color: "#00AFF0",
                 };
               }
 

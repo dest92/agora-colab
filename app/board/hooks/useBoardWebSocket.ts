@@ -266,14 +266,14 @@ export const useBoardWebSocket = ({
 
       const currentUser = getCurrentUser();
       const isCurrentUser = userId === currentUser?.id;
-      
+
       let assigneeInfo = await getUserInfo(userId);
       if (isCurrentUser) {
         assigneeInfo = {
           ...assigneeInfo,
           name: "You",
           emoji: "👤",
-          color: "#00AFF0"
+          color: "#00AFF0",
         };
       }
 
