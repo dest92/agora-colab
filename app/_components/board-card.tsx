@@ -1,51 +1,63 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { Trash2, ChevronDown, ChevronUp, Tag, ThumbsUp, ThumbsDown, MessageSquare } from "lucide-react"
-import { Textarea } from "./ui/textarea"
-import { Input } from "./ui/input"
+import { useState } from "react";
+import {
+  Trash2,
+  ChevronDown,
+  ChevronUp,
+  Tag,
+  ThumbsUp,
+  ThumbsDown,
+  MessageSquare,
+} from "lucide-react";
+import { Textarea } from "./ui/textarea";
+import { Input } from "./ui/input";
 
 interface Comment {
-  id: string
-  author: any
-  content: string
-  timestamp: number
+  id: string;
+  author: any;
+  content: string;
+  timestamp: number;
 }
 
 interface Card {
-  id: string
-  content: string
-  author: any
-  column: string
-  priority: "high" | "medium" | "low"
-  likes: string[]
-  dislikes: string[]
-  comments: Comment[]
-  assignedTo?: any
-  timestamp: number
-  tags: string[]
+  id: string;
+  content: string;
+  author: any;
+  column: string;
+  priority: "low" | "normal" | "high" | "urgent";
+  likes: string[];
+  dislikes: string[];
+  comments: Comment[];
+  assignedTo?: any;
+  timestamp: number;
+  tags: string[];
 }
 
 interface BoardCardProps {
-  card: Card
-  onDelete: (cardId: string) => void
-  onVote: (cardId: string, type: "like" | "dislike") => void
-  onAddComment: (cardId: string, content: string) => void
-  onChangePriority: (cardId: string, priority: "high" | "medium" | "low") => void
-  onAssignUser: (cardId: string, user: any | undefined) => void
-  onAddTag: (cardId: string, tag: string) => void
-  onRemoveTag: (cardId: string, tag: string) => void
-  currentUser: any
-  activeUsers: any[]
+  card: Card;
+  onDelete: (cardId: string) => void;
+  onVote: (cardId: string, type: "like" | "dislike") => void;
+  onAddComment: (cardId: string, content: string) => void;
+  onChangePriority: (
+    cardId: string,
+    priority: "low" | "normal" | "high" | "urgent"
+  ) => void;
+  onAssignUser: (cardId: string, user: any | undefined) => void;
+  onAddTag: (cardId: string, tag: string) => void;
+  onRemoveTag: (cardId: string, tag: string) => void;
+  currentUser: any;
+  activeUsers: any[];
 }
 
 const PRIORITY_COLORS = {
-  high: "#e81123",
-  medium: "#FA6800",
+  urgent: "#e81123",
+  high: "#FA6800",
+  normal: "#00AFF0",
   low: "#8CBF26",
-}
+};
 
 export function BoardCard({
   card,
@@ -59,44 +71,44 @@ export function BoardCard({
   currentUser,
   activeUsers,
 }: BoardCardProps) {
-  const [isExpanded, setIsExpanded] = useState(false)
-  const [showComments, setShowComments] = useState(false)
-  const [commentInput, setCommentInput] = useState("")
-  const [showPriorityMenu, setShowPriorityMenu] = useState(false)
-  const [showAssignMenu, setShowAssignMenu] = useState(false)
-  const [showTagInput, setShowTagInput] = useState(false)
-  const [tagInput, setTagInput] = useState("")
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [commentInput, setCommentInput] = useState("");
+  const [showPriorityMenu, setShowPriorityMenu] = useState(false);
+  const [showAssignMenu, setShowAssignMenu] = useState(false);
+  const [showTagInput, setShowTagInput] = useState(false);
+  const [tagInput, setTagInput] = useState("");
 
   const handleDragStart = (e: React.DragEvent) => {
-    e.dataTransfer.setData("cardId", card.id)
-  }
+    e.dataTransfer.setData("cardId", card.id);
+  };
 
   const handleAddComment = () => {
-    if (!commentInput.trim()) return
-    onAddComment(card.id, commentInput.trim())
-    setCommentInput("")
-  }
+    if (!commentInput.trim()) return;
+    onAddComment(card.id, commentInput.trim());
+    setCommentInput("");
+  };
 
   const handleAddTag = () => {
-    if (!tagInput.trim()) return
-    onAddTag(card.id, tagInput.trim())
-    setTagInput("")
-    setShowTagInput(false)
-  }
+    if (!tagInput.trim()) return;
+    onAddTag(card.id, tagInput.trim());
+    setTagInput("");
+    setShowTagInput(false);
+  };
 
   const formatTime = (timestamp: number) => {
-    const date = new Date(timestamp)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const minutes = Math.floor(diff / 60000)
-    const hours = Math.floor(diff / 3600000)
-    const days = Math.floor(diff / 86400000)
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diff = now.getTime() - date.getTime();
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(diff / 3600000);
+    const days = Math.floor(diff / 86400000);
 
-    if (minutes < 1) return "just now"
-    if (minutes < 60) return `${minutes}m ago`
-    if (hours < 24) return `${hours}h ago`
-    return `${days}d ago`
-  }
+    if (minutes < 1) return "just now";
+    if (minutes < 60) return `${minutes}m ago`;
+    if (hours < 24) return `${hours}h ago`;
+    return `${days}d ago`;
+  };
 
   return (
     <div
@@ -104,15 +116,25 @@ export function BoardCard({
       onDragStart={handleDragStart}
       className="bg-[#1a1a1a] border-2 border-[#333333] group hover:border-[#666666] transition-colors cursor-move"
     >
-      <div className="h-2" style={{ backgroundColor: PRIORITY_COLORS[card.priority] }} />
+      <div
+        className="h-2"
+        style={{ backgroundColor: PRIORITY_COLORS[card.priority] }}
+      />
 
       <div className="p-4">
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
             <span className="text-xl">{card.author.emoji}</span>
-            <span className="text-sm font-semibold text-white">{card.author.name}</span>
-            <div className="w-3 h-3" style={{ backgroundColor: card.author.color }} />
-            <span className="text-xs text-[#666666]">{formatTime(card.timestamp)}</span>
+            <span className="text-sm font-semibold text-white">
+              {card.author.name}
+            </span>
+            <div
+              className="w-3 h-3"
+              style={{ backgroundColor: card.author.color }}
+            />
+            <span className="text-xs text-[#666666]">
+              {formatTime(card.timestamp)}
+            </span>
           </div>
 
           <button
@@ -123,7 +145,9 @@ export function BoardCard({
           </button>
         </div>
 
-        <p className="text-sm leading-relaxed whitespace-pre-wrap text-white mb-4">{card.content}</p>
+        <p className="text-sm leading-relaxed whitespace-pre-wrap text-white mb-4">
+          {card.content}
+        </p>
 
         {card.tags.length > 0 && (
           <div className="flex flex-wrap gap-2 mb-3">
@@ -141,9 +165,13 @@ export function BoardCard({
 
         {card.assignedTo && (
           <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-[#2d2d2d]">
-            <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">assigned to</span>
+            <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">
+              assigned to
+            </span>
             <span className="text-lg">{card.assignedTo.emoji}</span>
-            <span className="text-sm font-semibold text-white">{card.assignedTo.name}</span>
+            <span className="text-sm font-semibold text-white">
+              {card.assignedTo.name}
+            </span>
           </div>
         )}
 
@@ -184,7 +212,11 @@ export function BoardCard({
             onClick={() => setIsExpanded(!isExpanded)}
             className="ml-auto h-9 w-9 bg-[#2d2d2d] hover:bg-[#3d3d3d] transition-colors flex items-center justify-center"
           >
-            {isExpanded ? <ChevronUp className="w-4 h-4 text-white" /> : <ChevronDown className="w-4 h-4 text-white" />}
+            {isExpanded ? (
+              <ChevronUp className="w-4 h-4 text-white" />
+            ) : (
+              <ChevronDown className="w-4 h-4 text-white" />
+            )}
           </button>
         </div>
 
@@ -192,7 +224,9 @@ export function BoardCard({
           <div className="space-y-3 pt-3 border-t-2 border-[#333333]">
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">priority</span>
+                <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">
+                  priority
+                </span>
                 <button
                   onClick={() => setShowPriorityMenu(!showPriorityMenu)}
                   className="text-xs text-[#00AFF0] font-semibold uppercase hover:text-[#00CFF0]"
@@ -202,29 +236,38 @@ export function BoardCard({
               </div>
 
               {showPriorityMenu && (
-                <div className="grid grid-cols-3 gap-2">
+                <div className="grid grid-cols-4 gap-2">
                   <button
                     onClick={() => {
-                      onChangePriority(card.id, "high")
-                      setShowPriorityMenu(false)
+                      onChangePriority(card.id, "urgent");
+                      setShowPriorityMenu(false);
                     }}
                     className="h-9 font-semibold text-white bg-[#e81123] hover:bg-[#c81020]"
+                  >
+                    urgent
+                  </button>
+                  <button
+                    onClick={() => {
+                      onChangePriority(card.id, "high");
+                      setShowPriorityMenu(false);
+                    }}
+                    className="h-9 font-semibold text-white bg-[#FA6800] hover:bg-[#da5800]"
                   >
                     high
                   </button>
                   <button
                     onClick={() => {
-                      onChangePriority(card.id, "medium")
-                      setShowPriorityMenu(false)
+                      onChangePriority(card.id, "normal");
+                      setShowPriorityMenu(false);
                     }}
-                    className="h-9 font-semibold text-white bg-[#FA6800] hover:bg-[#da5800]"
+                    className="h-9 font-semibold text-white bg-[#00AFF0] hover:bg-[#00CFF0]"
                   >
-                    medium
+                    normal
                   </button>
                   <button
                     onClick={() => {
-                      onChangePriority(card.id, "low")
-                      setShowPriorityMenu(false)
+                      onChangePriority(card.id, "low");
+                      setShowPriorityMenu(false);
                     }}
                     className="h-9 font-semibold text-white bg-[#8CBF26] hover:bg-[#7caf16]"
                   >
@@ -236,7 +279,9 @@ export function BoardCard({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">assign to</span>
+                <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">
+                  assign to
+                </span>
                 <button
                   onClick={() => setShowAssignMenu(!showAssignMenu)}
                   className="text-xs text-[#00AFF0] font-semibold uppercase hover:text-[#00CFF0]"
@@ -251,21 +296,26 @@ export function BoardCard({
                     <button
                       key={user.name}
                       onClick={() => {
-                        onAssignUser(card.id, user)
-                        setShowAssignMenu(false)
+                        onAssignUser(card.id, user);
+                        setShowAssignMenu(false);
                       }}
                       className="w-full flex items-center gap-2 px-3 py-2 bg-[#2d2d2d] hover:bg-[#3d3d3d] transition-colors"
                     >
                       <span className="text-lg">{user.emoji}</span>
-                      <span className="text-sm font-semibold text-white">{user.name}</span>
-                      <div className="w-3 h-3" style={{ backgroundColor: user.color }} />
+                      <span className="text-sm font-semibold text-white">
+                        {user.name}
+                      </span>
+                      <div
+                        className="w-3 h-3"
+                        style={{ backgroundColor: user.color }}
+                      />
                     </button>
                   ))}
                   {card.assignedTo && (
                     <button
                       onClick={() => {
-                        onAssignUser(card.id, undefined)
-                        setShowAssignMenu(false)
+                        onAssignUser(card.id, undefined);
+                        setShowAssignMenu(false);
                       }}
                       className="w-full h-9 font-semibold text-white bg-[#e81123] hover:bg-[#c81020]"
                     >
@@ -278,7 +328,9 @@ export function BoardCard({
 
             <div className="space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">tags</span>
+                <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">
+                  tags
+                </span>
                 <button
                   onClick={() => setShowTagInput(!showTagInput)}
                   className="text-xs text-[#00AFF0] font-semibold uppercase hover:text-[#00CFF0]"
@@ -316,10 +368,16 @@ export function BoardCard({
                 <div key={comment.id} className="bg-[#2d2d2d] p-3">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-base">{comment.author.emoji}</span>
-                    <span className="text-xs font-semibold text-white">{comment.author.name}</span>
-                    <span className="text-xs text-[#666666]">{formatTime(comment.timestamp)}</span>
+                    <span className="text-xs font-semibold text-white">
+                      {comment.author.name}
+                    </span>
+                    <span className="text-xs text-[#666666]">
+                      {formatTime(comment.timestamp)}
+                    </span>
                   </div>
-                  <p className="text-sm text-white leading-relaxed">{comment.content}</p>
+                  <p className="text-sm text-white leading-relaxed">
+                    {comment.content}
+                  </p>
                 </div>
               ))}
             </div>
@@ -330,8 +388,8 @@ export function BoardCard({
                 onChange={(e) => setCommentInput(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault()
-                    handleAddComment()
+                    e.preventDefault();
+                    handleAddComment();
                   }
                 }}
                 placeholder="add a comment..."
@@ -348,5 +406,5 @@ export function BoardCard({
         )}
       </div>
     </div>
-  )
+  );
 }

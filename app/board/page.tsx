@@ -1,6 +1,9 @@
-"use client";
+/**
+ * Board Page - Refactored
+ * Main board view with all functionality split into custom hooks
+ */
 
-import type React from "react";
+"use client";
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -14,63 +17,26 @@ import {
   Download,
   Upload,
   Clock,
+  UserPlus,
+  ArrowLeft,
 } from "lucide-react";
 import { Input } from "../_components/ui/input";
-import { handleLogout } from "../utils/auth"; // Import handleLogout from auth utils
+import { authApi, workspacesApi } from "@/app/_lib/api";
+import { useBoardData, type User } from "./hooks/useBoardData";
+import { useBoardActions } from "./hooks/useBoardActions";
+import { useBoardWebSocket } from "./hooks/useBoardWebSocket";
+import { InviteUserModal } from "@/app/_components/invite-user-modal-search";
+import { ActiveUsersDropdown } from "@/app/_components/active-users-dropdown";
+import { NotificationBell } from "@/app/_components/notification-bell";
 
-interface User {
-  name: string;
-  emoji: string;
-  color: string;
-}
-
-interface Comment {
-  id: string;
-  author: User;
-  content: string;
-  timestamp: number;
-}
-
-interface Card {
-  id: string;
-  content: string;
-  author: User;
-  column: string;
-  priority: "high" | "medium" | "low";
-  likes: string[];
-  dislikes: string[];
-  comments: Comment[];
-  assignedTo?: User;
-  timestamp: number;
-  tags: string[];
-}
-
-const getStoredUser = (): User | null => {
-  if (typeof window === "undefined") return null;
-
-  const stored = localStorage.getItem("wp-user");
-  if (!stored) return null;
-
-  try {
-    return JSON.parse(stored) as User;
-  } catch (error) {
-    console.error("Failed to parse stored user:", error);
-    return null;
-  }
-};
-
-const getStoredCards = (): Card[] => {
-  if (typeof window === "undefined") return [];
-
-  const stored = localStorage.getItem("wp-cards");
-  if (!stored) return [];
-
-  try {
-    return JSON.parse(stored) as Card[];
-  } catch (error) {
-    console.error("Failed to parse stored cards:", error);
-    return [];
-  }
+const getCurrentUser = (): User => {
+  const user = authApi.getCurrentUser();
+  return {
+    name: user?.email?.split("@")[0] || "User",
+    emoji: "👤",
+    color: "#00AFF0",
+    id: user?.id || undefined,
+  };
 };
 
 const COLUMNS = [
@@ -82,49 +48,87 @@ const COLUMNS = [
 export default function BoardPage() {
   const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
-  const [cards, setCards] = useState<Card[]>([]);
+  const [boardId, setBoardId] = useState<string>("");
+  const [workspaceId, setWorkspaceId] = useState<string>("");
+  const [activeUsers, setActiveUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filterPriority, setFilterPriority] = useState<
-    "all" | "high" | "medium" | "low"
+    "all" | "low" | "normal" | "high" | "urgent"
   >("all");
   const [filterUser, setFilterUser] = useState<string | "all">("all");
   const [showStats, setShowStats] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
   const [sessionTime, setSessionTime] = useState(0);
+  const [inviteModalOpen, setInviteModalOpen] = useState(false);
+  const [workspaceName, setWorkspaceName] = useState<string>("");
 
+  // Custom hooks for data management
+  const { cards, setCards, lanes, loading, loadLanes, loadCards } =
+    useBoardData();
+
+  const boardActions = useBoardActions({
+    boardId,
+    lanes,
+    cards,
+    setCards,
+    user,
+  });
+
+  // WebSocket connection and listeners
+  useBoardWebSocket({
+    boardId,
+    workspaceId,
+    lanes,
+    cards,
+    setCards,
+    setActiveUsers,
+    loadLanes,
+    loadCards,
+    getCurrentUser,
+  });
+
+  // Initialize board
   useEffect(() => {
-    const storedUser = getStoredUser();
-    const storedCards = getStoredCards();
-    setUser(storedUser);
-    setCards(storedCards);
-
-    if (!storedUser) {
-      router.push("/");
+    const authenticated = authApi.isAuthenticated();
+    if (!authenticated) {
+      router.push("/login");
       return;
     }
-  }, [router]);
 
-  useEffect(() => {
-    const handleStorageChange = (event: StorageEvent) => {
-      if (event.key === "wp-user") {
-        setUser(getStoredUser());
-      }
+    const selectedBoard = localStorage.getItem("agora-selected-board");
+    const selectedWorkspace = localStorage.getItem("agora-selected-workspace");
 
-      if (event.key === "wp-cards") {
-        setCards(getStoredCards());
+    if (!selectedBoard || !selectedWorkspace) {
+      router.push("/dashboard");
+      return;
+    }
+
+    setBoardId(selectedBoard);
+    setWorkspaceId(selectedWorkspace);
+    setUser(getCurrentUser());
+
+    // Load workspace name
+    const loadWorkspaceName = async () => {
+      try {
+        const workspaces = await workspacesApi.listWorkspaces();
+        const workspace = workspaces.find((w) => w.id === selectedWorkspace);
+        if (workspace) {
+          setWorkspaceName(workspace.name);
+        }
+      } catch (error) {
+        console.error("Failed to load workspace name:", error);
       }
     };
+    loadWorkspaceName();
 
-    window.addEventListener("storage", handleStorageChange);
-    return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+    const initializeBoard = async () => {
+      const loadedLanes = await loadLanes(selectedBoard);
+      await loadCards(selectedBoard, loadedLanes);
+    };
+    initializeBoard();
+  }, [router]);
 
-  useEffect(() => {
-    if (cards.length > 0) {
-      localStorage.setItem("wp-cards", JSON.stringify(cards));
-    }
-  }, [cards]);
-
+  // Session timer
   useEffect(() => {
     const interval = setInterval(() => {
       setSessionTime((prev) => prev + 1);
@@ -132,133 +136,7 @@ export default function BoardPage() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleAddCard = (
-    columnId: string,
-    content: string,
-    priority: "high" | "medium" | "low"
-  ) => {
-    if (!user) return;
-
-    const newCard: Card = {
-      id: Date.now().toString(),
-      content,
-      author: user,
-      column: columnId,
-      priority,
-      likes: [],
-      dislikes: [],
-      comments: [],
-      timestamp: Date.now(),
-      tags: [],
-    };
-
-    setCards([...cards, newCard]);
-  };
-
-  const handleMoveCard = (cardId: string, newColumn: string) => {
-    setCards(
-      cards.map((card) =>
-        card.id === cardId ? { ...card, column: newColumn } : card
-      )
-    );
-  };
-
-  const handleDeleteCard = (cardId: string) => {
-    setCards(cards.filter((card) => card.id !== cardId));
-  };
-
-  const handleVote = (cardId: string, type: "like" | "dislike") => {
-    if (!user) return;
-
-    setCards(
-      cards.map((card) => {
-        if (card.id !== cardId) return card;
-
-        const newCard = { ...card };
-
-        if (type === "like") {
-          if (newCard.likes.includes(user.name)) {
-            newCard.likes = newCard.likes.filter((name) => name !== user.name);
-          } else {
-            newCard.likes = [...newCard.likes, user.name];
-            newCard.dislikes = newCard.dislikes.filter(
-              (name) => name !== user.name
-            );
-          }
-        } else {
-          if (newCard.dislikes.includes(user.name)) {
-            newCard.dislikes = newCard.dislikes.filter(
-              (name) => name !== user.name
-            );
-          } else {
-            newCard.dislikes = [...newCard.dislikes, user.name];
-            newCard.likes = newCard.likes.filter((name) => name !== user.name);
-          }
-        }
-
-        return newCard;
-      })
-    );
-  };
-
-  const handleAddComment = (cardId: string, content: string) => {
-    if (!user) return;
-
-    setCards(
-      cards.map((card) => {
-        if (card.id !== cardId) return card;
-
-        const newComment: Comment = {
-          id: Date.now().toString(),
-          author: user,
-          content,
-          timestamp: Date.now(),
-        };
-
-        return {
-          ...card,
-          comments: [...card.comments, newComment],
-        };
-      })
-    );
-  };
-
-  const handleChangePriority = (
-    cardId: string,
-    priority: "high" | "medium" | "low"
-  ) => {
-    setCards(
-      cards.map((card) => (card.id === cardId ? { ...card, priority } : card))
-    );
-  };
-
-  const handleAssignUser = (cardId: string, assignedUser: User | undefined) => {
-    setCards(
-      cards.map((card) =>
-        card.id === cardId ? { ...card, assignedTo: assignedUser } : card
-      )
-    );
-  };
-
-  const handleAddTag = (cardId: string, tag: string) => {
-    setCards(
-      cards.map((card) => {
-        if (card.id !== cardId) return card;
-        if (card.tags.includes(tag)) return card;
-        return { ...card, tags: [...card.tags, tag] };
-      })
-    );
-  };
-
-  const handleRemoveTag = (cardId: string, tag: string) => {
-    setCards(
-      cards.map((card) => {
-        if (card.id !== cardId) return card;
-        return { ...card, tags: card.tags.filter((t) => t !== tag) };
-      })
-    );
-  };
-
+  // Export/Import handlers
   const handleExport = () => {
     const data = {
       cards,
@@ -294,6 +172,12 @@ export default function BoardPage() {
     reader.readAsText(file);
   };
 
+  const handleLogout = async () => {
+    await authApi.logout();
+    router.push("/login");
+  };
+
+  // Filtering
   const filteredCards = cards.filter((card) => {
     const matchesSearch =
       searchQuery === "" ||
@@ -314,15 +198,15 @@ export default function BoardPage() {
     return matchesSearch && matchesPriority && matchesUser;
   });
 
-  const activeUsers = user ? [user] : [];
-
+  // Stats
   const stats = {
     total: cards.length,
     ideas: cards.filter((c) => c.column === "ideas").length,
     discuss: cards.filter((c) => c.column === "discuss").length,
     decided: cards.filter((c) => c.column === "decided").length,
+    urgent: cards.filter((c) => c.priority === "urgent").length,
     high: cards.filter((c) => c.priority === "high").length,
-    medium: cards.filter((c) => c.priority === "medium").length,
+    normal: cards.filter((c) => c.priority === "normal").length,
     low: cards.filter((c) => c.priority === "low").length,
     totalLikes: cards.reduce((sum, c) => sum + c.likes.length, 0),
     totalComments: cards.reduce((sum, c) => sum + c.comments.length, 0),
@@ -337,142 +221,199 @@ export default function BoardPage() {
       .padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#1e1e1e]">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-[#00AFF0] border-t-transparent animate-spin mx-auto mb-4"></div>
+          <p className="text-white/60 uppercase text-xs tracking-wider">
+            Loading board...
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (!user) return null;
 
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      {/* Header */}
       <header className="bg-[#1a1a1a] border-b-2 border-[#333333]">
-        <div className="container mx-auto px-2 sm:px-4 md:px-6 py-2 sm:py-3 md:py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-          <div className="flex items-center gap-2 sm:gap-4 flex-wrap">
-            <h1 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-white">
-              decision board
-            </h1>
-            <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 md:px-4 py-1 sm:py-2 bg-[#2d2d2d]">
-              <Users className="w-3 h-3 sm:w-4 sm:h-4 text-white" />
-              <span className="text-xs sm:text-sm font-semibold text-white">
-                {activeUsers.length}
-              </span>
+        <div className="container mx-auto px-3 sm:px-6 py-3 sm:py-4">
+          {/* Top row - Title and User */}
+          <div className="flex items-center justify-between mb-3 sm:mb-0">
+            <div className="flex items-center gap-2 sm:gap-4">
+              <button
+                onClick={() => router.push("/dashboard")}
+                className="w-10 h-10 sm:w-12 sm:h-12 bg-[#2d2d2d] hover:bg-[#00AFF0] transition-colors flex items-center justify-center group"
+                title="Back to Dashboard"
+              >
+                <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5 text-white group-hover:scale-110 transition-transform" />
+              </button>
+              <h1 className="text-lg sm:text-2xl font-semibold tracking-tight text-white">
+                decision board
+              </h1>
             </div>
-            <div className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 md:px-4 py-1 sm:py-2 bg-[#2d2d2d]">
-              <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-[#00AFF0]" />
-              <span className="text-xs sm:text-sm font-semibold text-white">
-                {formatSessionTime(sessionTime)}
-              </span>
+
+            <div className="flex items-center gap-2 sm:gap-3">
+              <div className="flex items-center gap-2 px-2 sm:px-4 py-2 bg-[#2d2d2d]">
+                <span className="text-xl sm:text-2xl">{user.emoji}</span>
+                <span className="hidden sm:inline font-semibold text-white">
+                  {user.name}
+                </span>
+                <div
+                  className="w-3 h-3 sm:w-4 sm:h-4"
+                  style={{ backgroundColor: user.color }}
+                />
+              </div>
+
+              <NotificationBell />
+
+              <button
+                onClick={handleLogout}
+                className="w-10 h-10 sm:w-12 sm:h-12 bg-[#2d2d2d] hover:bg-[#e81123] transition-colors flex items-center justify-center"
+              >
+                <LogOut className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-3 w-full sm:w-auto justify-between sm:justify-start">
-            <div className="flex items-center gap-2 sm:gap-3 px-2 sm:px-3 md:px-4 py-1 sm:py-2 bg-[#2d2d2d]">
-              <span className="text-lg sm:text-xl md:text-2xl">
-                {user.emoji}
+          {/* Bottom row - Actions (only on desktop) */}
+          <div className="hidden sm:flex items-center gap-4 mt-3">
+            <ActiveUsersDropdown
+              activeUsers={activeUsers}
+              onInviteClick={() => setInviteModalOpen(true)}
+            />
+            <div className="flex items-center gap-2 px-4 py-2 bg-[#2d2d2d]">
+              <Clock className="w-4 h-4 text-[#00AFF0]" />
+              <span className="text-sm font-semibold text-white">
+                {formatSessionTime(sessionTime)}
               </span>
-              <span className="font-semibold text-white text-sm sm:text-base truncate max-w-[100px] sm:max-w-none">
-                {user.name}
-              </span>
-              <div
-                className="w-3 h-3 sm:w-4 sm:h-4"
-                style={{ backgroundColor: user.color }}
-              />
             </div>
-
             <button
-              onClick={handleLogout}
-              className="w-10 h-10 sm:w-12 sm:h-12 bg-[#2d2d2d] hover:bg-[#e81123] transition-colors flex items-center justify-center active:scale-95"
+              onClick={() => setInviteModalOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-[#00AFF0]/20 hover:bg-[#00AFF0]/30 text-[#00AFF0] transition-colors"
+              title="Invite user to workspace"
             >
-              <LogOut className="w-4 h-4 sm:w-5 sm:h-5 text-white" />
+              <UserPlus className="w-4 h-4" />
+              <span className="text-sm font-semibold">Invite</span>
             </button>
+          </div>
+
+          {/* Mobile actions row */}
+          <div className="flex sm:hidden items-center gap-2 mt-3 overflow-x-auto pb-2">
+            <button
+              onClick={() => setInviteModalOpen(true)}
+              className="flex items-center gap-2 px-3 py-2 bg-[#00AFF0]/20 text-[#00AFF0] whitespace-nowrap text-sm"
+              title="Invite user"
+            >
+              <UserPlus className="w-4 h-4" />
+              Invite
+            </button>
+            <div className="flex items-center gap-2 px-3 py-2 bg-[#2d2d2d] whitespace-nowrap">
+              <Clock className="w-4 h-4 text-[#00AFF0]" />
+              <span className="text-sm font-semibold text-white">
+                {formatSessionTime(sessionTime)}
+              </span>
+            </div>
+            <ActiveUsersDropdown
+              activeUsers={activeUsers}
+              onInviteClick={() => setInviteModalOpen(true)}
+            />
           </div>
         </div>
       </header>
 
+      {/* Search and filters bar */}
       <div className="bg-[#1a1a1a] border-b-2 border-[#333333]">
-        <div className="container mx-auto px-2 sm:px-4 md:px-6 py-2 sm:py-3">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-3 flex-wrap">
-            <div className="flex-1 min-w-[200px] max-w-full sm:max-w-md relative">
+        <div className="container mx-auto px-3 sm:px-6 py-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <div className="flex-1 min-w-[150px] sm:min-w-[200px] max-w-full sm:max-w-md relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[#666666]" />
               <Input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="search cards..."
-                className="h-10 pl-10 bg-[#000000] border-2 border-[#333333] focus:border-[#00AFF0] text-white placeholder:text-[#666666] rounded-none"
+                className="h-9 sm:h-10 pl-10 bg-[#000000] border-2 border-[#333333] focus:border-[#00AFF0] text-white placeholder:text-[#666666] rounded-none text-sm"
               />
             </div>
 
-            <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
-              <button
-                onClick={() => setShowFilters(!showFilters)}
-                className={`h-10 px-3 sm:px-4 font-semibold text-sm sm:text-base flex items-center gap-2 transition-colors whitespace-nowrap active:scale-95 ${
-                  showFilters
-                    ? "bg-[#00AFF0] text-white"
-                    : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
-                }`}
-              >
-                <Filter className="w-4 h-4" />
-                filters
-              </button>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`h-9 sm:h-10 px-3 sm:px-4 font-semibold flex items-center gap-2 transition-colors text-sm ${
+                showFilters
+                  ? "bg-[#00AFF0] text-white"
+                  : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              <span className="hidden sm:inline">filters</span>
+            </button>
 
-              <button
-                onClick={() => setShowStats(!showStats)}
-                className={`h-10 px-3 sm:px-4 font-semibold text-sm sm:text-base flex items-center gap-2 transition-colors whitespace-nowrap active:scale-95 ${
-                  showStats
-                    ? "bg-[#00AFF0] text-white"
-                    : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
-                }`}
-              >
-                <BarChart3 className="w-4 h-4" />
-                stats
-              </button>
+            <button
+              onClick={() => setShowStats(!showStats)}
+              className={`h-9 sm:h-10 px-3 sm:px-4 font-semibold flex items-center gap-2 transition-colors text-sm ${
+                showStats
+                  ? "bg-[#00AFF0] text-white"
+                  : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span className="hidden sm:inline">stats</span>
+            </button>
 
-              <button
-                onClick={handleExport}
-                className="h-10 px-3 sm:px-4 bg-[#2d2d2d] text-white hover:bg-[#3d3d3d] font-semibold text-sm sm:text-base flex items-center gap-2 transition-colors whitespace-nowrap active:scale-95"
-              >
-                <Download className="w-4 h-4" />
-                export
-              </button>
+            <button
+              onClick={handleExport}
+              className="h-9 sm:h-10 px-3 sm:px-4 bg-[#2d2d2d] text-white hover:bg-[#3d3d3d] font-semibold flex items-center gap-2 transition-colors text-sm"
+            >
+              <Download className="w-4 h-4" />
+              <span className="hidden sm:inline">export</span>
+            </button>
 
-              <label className="h-10 px-3 sm:px-4 bg-[#2d2d2d] text-white hover:bg-[#3d3d3d] font-semibold text-sm sm:text-base flex items-center gap-2 transition-colors cursor-pointer whitespace-nowrap active:scale-95">
-                <Upload className="w-4 h-4" />
-                import
-                <input
-                  type="file"
-                  accept=".json"
-                  onChange={handleImport}
-                  className="hidden"
-                />
-              </label>
-            </div>
+            <label className="h-9 sm:h-10 px-3 sm:px-4 bg-[#2d2d2d] text-white hover:bg-[#3d3d3d] font-semibold flex items-center gap-2 transition-colors cursor-pointer text-sm">
+              <Upload className="w-4 h-4" />
+              <span className="hidden sm:inline">import</span>
+              <input
+                type="file"
+                accept=".json"
+                onChange={handleImport}
+                className="hidden"
+              />
+            </label>
           </div>
 
           {showFilters && (
-            <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t-2 border-[#333333] flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+            <div className="mt-3 pt-3 border-t-2 border-[#333333] flex items-start sm:items-center gap-3 flex-wrap">
               <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">
                 priority:
               </span>
-              <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
-                {(["all", "high", "medium", "low"] as const).map((priority) => (
-                  <button
-                    key={priority}
-                    onClick={() => setFilterPriority(priority)}
-                    className={`h-8 px-3 font-semibold text-xs sm:text-sm transition-colors whitespace-nowrap active:scale-95 ${
-                      filterPriority === priority
-                        ? "bg-[#00AFF0] text-white"
-                        : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
-                    }`}
-                  >
-                    {priority}
-                  </button>
-                ))}
+              <div className="flex gap-2 flex-wrap">
+                {(["all", "urgent", "high", "normal", "low"] as const).map(
+                  (priority) => (
+                    <button
+                      key={priority}
+                      onClick={() => setFilterPriority(priority)}
+                      className={`h-7 sm:h-8 px-2 sm:px-3 font-semibold text-xs sm:text-sm transition-colors ${
+                        filterPriority === priority
+                          ? "bg-[#00AFF0] text-white"
+                          : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
+                      }`}
+                    >
+                      {priority}
+                    </button>
+                  )
+                )}
               </div>
 
-              <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider sm:ml-4">
+              <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider sm:ml-4 w-full sm:w-auto">
                 user:
               </span>
-              <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0">
+              <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={() => setFilterUser("all")}
-                  className={`h-8 px-3 font-semibold text-xs sm:text-sm transition-colors whitespace-nowrap active:scale-95 ${
+                  className={`h-7 sm:h-8 px-2 sm:px-3 font-semibold text-xs sm:text-sm transition-colors ${
                     filterUser === "all"
                       ? "bg-[#00AFF0] text-white"
                       : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
@@ -484,7 +425,7 @@ export default function BoardPage() {
                   <button
                     key={u.name}
                     onClick={() => setFilterUser(u.name)}
-                    className={`h-8 px-3 font-semibold text-xs sm:text-sm flex items-center gap-2 transition-colors whitespace-nowrap active:scale-95 ${
+                    className={`h-7 sm:h-8 px-2 sm:px-3 font-semibold text-xs sm:text-sm flex items-center gap-2 transition-colors ${
                       filterUser === u.name
                         ? "bg-[#00AFF0] text-white"
                         : "bg-[#2d2d2d] text-white hover:bg-[#3d3d3d]"
@@ -499,8 +440,8 @@ export default function BoardPage() {
           )}
 
           {showStats && (
-            <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t-2 border-[#333333]">
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-3">
+            <div className="mt-3 pt-3 border-t-2 border-[#333333]">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-8 gap-2 sm:gap-3">
                 <div className="bg-[#2d2d2d] p-2 sm:p-3">
                   <div className="text-xl sm:text-2xl font-bold text-white">
                     {stats.total}
@@ -535,18 +476,34 @@ export default function BoardPage() {
                 </div>
                 <div className="bg-[#e81123] p-2 sm:p-3">
                   <div className="text-xl sm:text-2xl font-bold text-white">
+                    {stats.urgent}
+                  </div>
+                  <div className="text-[10px] sm:text-xs text-white uppercase tracking-wider">
+                    urgent
+                  </div>
+                </div>
+                <div className="bg-[#FA6800] p-2 sm:p-3">
+                  <div className="text-xl sm:text-2xl font-bold text-white">
                     {stats.high}
                   </div>
                   <div className="text-[10px] sm:text-xs text-white uppercase tracking-wider">
                     high priority
                   </div>
                 </div>
-                <div className="bg-[#FA6800] p-2 sm:p-3">
+                <div className="bg-[#00AFF0] p-2 sm:p-3">
                   <div className="text-xl sm:text-2xl font-bold text-white">
-                    {stats.medium}
+                    {stats.normal}
                   </div>
                   <div className="text-[10px] sm:text-xs text-white uppercase tracking-wider">
-                    medium
+                    normal
+                  </div>
+                </div>
+                <div className="bg-[#8CBF26] p-2 sm:p-3">
+                  <div className="text-xl sm:text-2xl font-bold text-white">
+                    {stats.low}
+                  </div>
+                  <div className="text-[10px] sm:text-xs text-white uppercase tracking-wider">
+                    low
                   </div>
                 </div>
                 <div className="bg-[#2d2d2d] p-2 sm:p-3">
@@ -571,24 +528,25 @@ export default function BoardPage() {
         </div>
       </div>
 
-      <div className="bg-[#1a1a1a] border-b-2 border-[#333333]">
-        <div className="container mx-auto px-2 sm:px-4 md:px-6 py-2 sm:py-3">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
+      {/* Active users bar */}
+      <div className="bg-[#1a1a1a] border-b-2 border-[#333333] hidden lg:block">
+        <div className="container mx-auto px-3 sm:px-6 py-3">
+          <div className="flex items-center gap-4">
             <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">
               active now
             </span>
-            <div className="flex gap-2 overflow-x-auto pb-1 sm:pb-0 w-full sm:w-auto">
+            <div className="flex gap-2 overflow-x-auto pb-1">
               {activeUsers.map((u, i) => (
                 <div
                   key={i}
-                  className="flex items-center gap-1 sm:gap-2 px-2 sm:px-3 py-1 sm:py-1.5 bg-[#2d2d2d] whitespace-nowrap"
+                  className="flex items-center gap-2 px-3 py-1.5 bg-[#2d2d2d] whitespace-nowrap"
                 >
-                  <span className="text-base sm:text-lg">{u.emoji}</span>
-                  <span className="text-xs sm:text-sm font-medium text-white">
+                  <span className="text-lg">{u.emoji}</span>
+                  <span className="text-sm font-medium text-white">
                     {u.name}
                   </span>
                   <div
-                    className="w-2 h-2 sm:w-3 sm:h-3"
+                    className="w-3 h-3"
                     style={{ backgroundColor: u.color }}
                   />
                 </div>
@@ -598,28 +556,43 @@ export default function BoardPage() {
         </div>
       </div>
 
-      <main className="flex-1 container mx-auto px-2 sm:px-4 md:px-6 py-3 sm:py-4 md:py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 md:gap-6 h-full">
+      {/* Board columns */}
+      <main className="flex-1 container mx-auto px-3 sm:px-6 py-4 sm:py-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 h-full">
           {COLUMNS.map((column) => (
             <BoardColumn
               key={column.id}
               column={column}
               cards={filteredCards.filter((card) => card.column === column.id)}
-              onAddCard={handleAddCard}
-              onMoveCard={handleMoveCard}
-              onDeleteCard={handleDeleteCard}
-              onVote={handleVote}
-              onAddComment={handleAddComment}
-              onChangePriority={handleChangePriority}
-              onAssignUser={handleAssignUser}
-              onAddTag={handleAddTag}
-              onRemoveTag={handleRemoveTag}
+              onAddCard={boardActions.handleAddCard}
+              onMoveCard={boardActions.handleMoveCard}
+              onDeleteCard={boardActions.handleDeleteCard}
+              onVote={boardActions.handleVote}
+              onAddComment={boardActions.handleAddComment}
+              onChangePriority={boardActions.handleChangePriority}
+              onAssignUser={boardActions.handleAssignUser}
+              onAddTag={boardActions.handleAddTag}
+              onRemoveTag={boardActions.handleRemoveTag}
               currentUser={user}
               activeUsers={activeUsers}
             />
           ))}
         </div>
       </main>
+
+      {/* Invite User Modal */}
+      {workspaceId && (
+        <InviteUserModal
+          workspaceId={workspaceId}
+          workspaceName={workspaceName || "Workspace"}
+          isOpen={inviteModalOpen}
+          onClose={() => setInviteModalOpen(false)}
+          onInviteSent={() => {
+            console.log("Invitation sent from board view");
+            // Optionally show a success notification
+          }}
+        />
+      )}
     </div>
   );
 }

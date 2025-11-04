@@ -2,14 +2,15 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { authApi } from "@/app/_lib/api";
 
 export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    const user = localStorage.getItem("wp-user");
-    if (user) {
-      router.push("/board");
+    const authenticated = authApi.isAuthenticated();
+    if (authenticated) {
+      router.push("/dashboard");
     } else {
       router.push("/login");
     }

@@ -1,59 +1,66 @@
-"use client"
+"use client";
 
-import type React from "react"
+import type React from "react";
 
-import { useState } from "react"
-import { BoardCard } from "./board-card"
-import { Textarea } from "./ui/textarea"
-import { Plus, X } from "lucide-react"
+import { useState } from "react";
+import { BoardCard } from "./board-card";
+import { Textarea } from "./ui/textarea";
+import { Plus, X } from "lucide-react";
 
 interface User {
-  name: string
-  emoji: string
-  color: string
+  name: string;
+  emoji: string;
+  color: string;
 }
 
 interface Comment {
-  id: string
-  author: User
-  content: string
-  timestamp: number
+  id: string;
+  author: User;
+  content: string;
+  timestamp: number;
 }
 
 interface Card {
-  id: string
-  content: string
-  author: User
-  column: string
-  priority: "high" | "medium" | "low"
-  likes: string[]
-  dislikes: string[]
-  comments: Comment[]
-  assignedTo?: User
-  timestamp: number
-  tags: string[]
+  id: string;
+  content: string;
+  author: User;
+  column: string;
+  priority: "low" | "normal" | "high" | "urgent";
+  likes: string[];
+  dislikes: string[];
+  comments: Comment[];
+  assignedTo?: User;
+  timestamp: number;
+  tags: string[];
 }
 
 interface Column {
-  id: string
-  title: string
-  color: string
+  id: string;
+  title: string;
+  color: string;
 }
 
 interface BoardColumnProps {
-  column: Column
-  cards: Card[]
-  onAddCard: (columnId: string, content: string, priority: "high" | "medium" | "low") => void
-  onMoveCard: (cardId: string, newColumn: string) => void
-  onDeleteCard: (cardId: string) => void
-  onVote: (cardId: string, type: "like" | "dislike") => void
-  onAddComment: (cardId: string, content: string) => void
-  onChangePriority: (cardId: string, priority: "high" | "medium" | "low") => void
-  onAssignUser: (cardId: string, user: User | undefined) => void
-  onAddTag: (cardId: string, tag: string) => void
-  onRemoveTag: (cardId: string, tag: string) => void
-  currentUser: User
-  activeUsers: User[]
+  column: Column;
+  cards: Card[];
+  onAddCard: (
+    columnId: string,
+    content: string,
+    priority: "low" | "normal" | "high" | "urgent"
+  ) => void;
+  onMoveCard: (cardId: string, newColumn: string) => void;
+  onDeleteCard: (cardId: string) => void;
+  onVote: (cardId: string, type: "like" | "dislike") => void;
+  onAddComment: (cardId: string, content: string) => void;
+  onChangePriority: (
+    cardId: string,
+    priority: "low" | "normal" | "high" | "urgent"
+  ) => void;
+  onAssignUser: (cardId: string, user: User | undefined) => void;
+  onAddTag: (cardId: string, tag: string) => void;
+  onRemoveTag: (cardId: string, tag: string) => void;
+  currentUser: User;
+  activeUsers: User[];
 }
 
 const COLOR_MAP: Record<string, string> = {
@@ -62,7 +69,7 @@ const COLOR_MAP: Record<string, string> = {
   "wp-lime": "#8CBF26",
   "wp-orange": "#FA6800",
   "wp-purple": "#A200FF",
-}
+};
 
 export function BoardColumn({
   column,
@@ -79,52 +86,54 @@ export function BoardColumn({
   currentUser,
   activeUsers,
 }: BoardColumnProps) {
-  const [isAdding, setIsAdding] = useState(false)
-  const [newCardContent, setNewCardContent] = useState("")
-  const [newCardPriority, setNewCardPriority] = useState<"high" | "medium" | "low">("medium")
-  const [isDragOver, setIsDragOver] = useState(false)
+  const [isAdding, setIsAdding] = useState(false);
+  const [newCardContent, setNewCardContent] = useState("");
+  const [newCardPriority, setNewCardPriority] = useState<
+    "low" | "normal" | "high" | "urgent"
+  >("normal");
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const handleAdd = () => {
-    if (!newCardContent.trim()) return
+    if (!newCardContent.trim()) return;
 
-    onAddCard(column.id, newCardContent.trim(), newCardPriority)
-    setNewCardContent("")
-    setNewCardPriority("medium")
-    setIsAdding(false)
-  }
+    onAddCard(column.id, newCardContent.trim(), newCardPriority);
+    setNewCardContent("");
+    setNewCardPriority("normal");
+    setIsAdding(false);
+  };
 
   const handleCancel = () => {
-    setNewCardContent("")
-    setNewCardPriority("medium")
-    setIsAdding(false)
-  }
+    setNewCardContent("");
+    setNewCardPriority("normal");
+    setIsAdding(false);
+  };
 
   const handleDragOver = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(true)
-  }
+    e.preventDefault();
+    setIsDragOver(true);
+  };
 
   const handleDragLeave = () => {
-    setIsDragOver(false)
-  }
+    setIsDragOver(false);
+  };
 
   const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragOver(false)
+    e.preventDefault();
+    setIsDragOver(false);
 
-    const cardId = e.dataTransfer.getData("cardId")
+    const cardId = e.dataTransfer.getData("cardId");
     if (cardId) {
-      onMoveCard(cardId, column.id)
+      onMoveCard(cardId, column.id);
     }
-  }
+  };
 
   const sortedCards = [...cards].sort((a, b) => {
-    const priorityOrder = { high: 0, medium: 1, low: 2 }
+    const priorityOrder = { urgent: 0, high: 1, normal: 2, low: 3 };
     if (priorityOrder[a.priority] !== priorityOrder[b.priority]) {
-      return priorityOrder[a.priority] - priorityOrder[b.priority]
+      return priorityOrder[a.priority] - priorityOrder[b.priority];
     }
-    return b.timestamp - a.timestamp
-  })
+    return b.timestamp - a.timestamp;
+  });
 
   return (
     <div
@@ -133,9 +142,14 @@ export function BoardColumn({
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="p-5 mb-4" style={{ backgroundColor: COLOR_MAP[column.color] }}>
+      <div
+        className="p-5 mb-4"
+        style={{ backgroundColor: COLOR_MAP[column.color] }}
+      >
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold text-white tracking-tight lowercase">{column.title}</h2>
+          <h2 className="text-2xl font-semibold text-white tracking-tight lowercase">
+            {column.title}
+          </h2>
           <div className="px-3 py-1 bg-black/30 text-white font-bold text-lg min-w-[40px] text-center">
             {cards.length}
           </div>
@@ -175,28 +189,46 @@ export function BoardColumn({
             />
 
             <div className="space-y-2">
-              <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">priority</span>
-              <div className="grid grid-cols-3 gap-2">
+              <span className="text-xs text-[#999999] font-semibold uppercase tracking-wider">
+                priority
+              </span>
+              <div className="grid grid-cols-4 gap-2">
+                <button
+                  onClick={() => setNewCardPriority("urgent")}
+                  className={`h-10 font-semibold text-white transition-colors ${
+                    newCardPriority === "urgent"
+                      ? "bg-[#e81123]"
+                      : "bg-[#2d2d2d] hover:bg-[#3d3d3d]"
+                  }`}
+                >
+                  urgent
+                </button>
                 <button
                   onClick={() => setNewCardPriority("high")}
                   className={`h-10 font-semibold text-white transition-colors ${
-                    newCardPriority === "high" ? "bg-[#e81123]" : "bg-[#2d2d2d] hover:bg-[#3d3d3d]"
+                    newCardPriority === "high"
+                      ? "bg-[#FA6800]"
+                      : "bg-[#2d2d2d] hover:bg-[#3d3d3d]"
                   }`}
                 >
                   high
                 </button>
                 <button
-                  onClick={() => setNewCardPriority("medium")}
+                  onClick={() => setNewCardPriority("normal")}
                   className={`h-10 font-semibold text-white transition-colors ${
-                    newCardPriority === "medium" ? "bg-[#FA6800]" : "bg-[#2d2d2d] hover:bg-[#3d3d3d]"
+                    newCardPriority === "normal"
+                      ? "bg-[#00AFF0]"
+                      : "bg-[#2d2d2d] hover:bg-[#3d3d3d]"
                   }`}
                 >
-                  medium
+                  normal
                 </button>
                 <button
                   onClick={() => setNewCardPriority("low")}
                   className={`h-10 font-semibold text-white transition-colors ${
-                    newCardPriority === "low" ? "bg-[#8CBF26]" : "bg-[#2d2d2d] hover:bg-[#3d3d3d]"
+                    newCardPriority === "low"
+                      ? "bg-[#8CBF26]"
+                      : "bg-[#2d2d2d] hover:bg-[#3d3d3d]"
                   }`}
                 >
                   low
@@ -238,5 +270,5 @@ export function BoardColumn({
         </button>
       )}
     </div>
-  )
+  );
 }

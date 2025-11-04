@@ -5,40 +5,28 @@ import type React from "react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { authApi } from "@/app/_lib/api";
+import DecryptedText from "@/app/_components/ui/decrypted-text";
 
 export default function LoginPage() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
-    // Get stored users
-    const usersData = localStorage.getItem("wp-users");
-    const users = usersData ? JSON.parse(usersData) : [];
-
-    // Find user
-    const user = users.find(
-      (u: any) => u.email === email && u.password === password
-    );
-
-    if (user) {
-      // Store current user session
-      localStorage.setItem(
-        "wp-user",
-        JSON.stringify({
-          name: user.name,
-          emoji: user.emoji,
-          color: user.color,
-          email: user.email,
-        })
-      );
-      router.push("/board");
-    } else {
-      setError("invalid credentials");
+    try {
+      await authApi.login({ email, password });
+      router.push("/dashboard");
+    } catch (err: any) {
+      setError(err.message || "invalid credentials");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -46,11 +34,19 @@ export default function LoginPage() {
     <main className="min-h-screen flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8 bg-[#1e1e1e]">
       <div className="w-full max-w-sm sm:max-w-md lg:max-w-lg">
         {/* Header */}
-        <div className="mb-6 sm:mb-8 px-2 sm:px-0">
-          <h1 className="text-4xl sm:text-5xl md:text-6xl font-light text-white mb-2">
-            hello
+        <div className="mb-8">
+          <h1 className="text-5xl font-light text-white mb-2">
+            <DecryptedText
+              text="agora colab"
+              speed={30}
+              sequential={true}
+              revealDirection="start"
+              animateOn="view"
+              className="text-white"
+              encryptedClassName="text-white/40"
+            />
           </h1>
-          <p className="text-white/60 uppercase text-[10px] sm:text-xs tracking-wider">
+          <p className="text-white/60 uppercase text-xs tracking-wider">
             SIGN IN TO CONTINUE
           </p>
         </div>
@@ -58,8 +54,8 @@ export default function LoginPage() {
         {/* Login Form */}
         <form onSubmit={handleLogin} className="space-y-0">
           {/* Email Tile */}
-          <div className="bg-[#0078D7] p-4 sm:p-6 md:p-8 mb-1">
-            <label className="block text-white/80 uppercase text-[10px] sm:text-xs tracking-wider mb-2 sm:mb-3">
+          <div className="bg-[#0078D7] p-6 mb-1">
+            <label className="block text-white/80 uppercase text-xs tracking-wider mb-3">
               EMAIL
             </label>
             <input
@@ -73,8 +69,8 @@ export default function LoginPage() {
           </div>
 
           {/* Password Tile */}
-          <div className="bg-[#00AFF0] p-4 sm:p-6 md:p-8 mb-1">
-            <label className="block text-white/80 uppercase text-[10px] sm:text-xs tracking-wider mb-2 sm:mb-3">
+          <div className="bg-[#00AFF0] p-6 mb-1">
+            <label className="block text-white/80 uppercase text-xs tracking-wider mb-3">
               PASSWORD
             </label>
             <input
@@ -89,8 +85,8 @@ export default function LoginPage() {
 
           {/* Error Message */}
           {error && (
-            <div className="bg-[#E3008C] p-3 sm:p-4 mb-1">
-              <p className="text-white text-xs sm:text-sm uppercase tracking-wider">
+            <div className="bg-[#E3008C] p-4 mb-1">
+              <p className="text-white text-sm uppercase tracking-wider">
                 {error}
               </p>
             </div>
@@ -100,9 +96,10 @@ export default function LoginPage() {
           <div className="grid grid-cols-2 gap-1 mt-1">
             <button
               type="submit"
-              className="bg-[#8CBF26] p-4 sm:p-6 md:p-8 text-white font-light text-base sm:text-xl md:text-2xl hover:bg-[#7AA622] transition-colors active:scale-95"
+              disabled={loading}
+              className="bg-[#8CBF26] p-6 text-white font-light text-xl hover:bg-[#7AA622] disabled:bg-[#666666] disabled:cursor-not-allowed transition-colors"
             >
-              sign in
+              {loading ? "signing in..." : "sign in"}
             </button>
             <Link
               href="/register"
@@ -115,22 +112,52 @@ export default function LoginPage() {
 
         {/* Info Tiles */}
         <div className="grid grid-cols-2 gap-1 mt-1">
-          <div className="bg-[#A200FF] p-3 sm:p-4 md:p-6 min-h-[60px] sm:min-h-20">
-            <p className="text-white/80 text-[10px] sm:text-xs uppercase tracking-wider mb-1">
+          <div className="bg-[#A200FF] p-4">
+            <p className="text-white/80 text-xs uppercase tracking-wider">
               COLLABORATIVE
             </p>
-            <p className="text-white text-xs sm:text-sm md:text-base font-light">
-              decision platform
+            <p className="text-white text-sm font-light">
+              <DecryptedText
+                text="decision platform"
+                speed={40}
+                maxIterations={8}
+                animateOn="hover"
+                className="text-white"
+                encryptedClassName="text-white/50"
+              />
             </p>
           </div>
-          <div className="bg-[#E3008C] p-3 sm:p-4 md:p-6 min-h-[60px] sm:min-h-20">
-            <p className="text-white/80 text-[10px] sm:text-xs uppercase tracking-wider mb-1">
+          <div className="bg-[#E3008C] p-4">
+            <p className="text-white/80 text-xs uppercase tracking-wider">
               REAL-TIME
             </p>
-            <p className="text-white text-xs sm:text-sm md:text-base font-light">
-              teamwork
+            <p className="text-white text-sm font-light">
+              <DecryptedText
+                text="teamwork"
+                speed={40}
+                maxIterations={8}
+                animateOn="hover"
+                className="text-white"
+                encryptedClassName="text-white/50"
+              />
             </p>
           </div>
+        </div>
+
+        {/* Additional animated text */}
+        <div className="mt-8 text-center">
+          <p className="text-white/40 text-xs uppercase tracking-widest">
+            <DecryptedText
+              text="collaborate • decide • execute"
+              speed={25}
+              sequential={true}
+              revealDirection="center"
+              animateOn="view"
+              className="text-white/60"
+              encryptedClassName="text-white/20"
+              characters="▓▒░█▄▀"
+            />
+          </p>
         </div>
       </div>
     </main>
