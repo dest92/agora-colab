@@ -157,7 +157,9 @@ export type WebSocketEvent =
   | "comment:added"
   // Votes (cuando se migren)
   | "vote:cast"
-  | "vote:removed";
+  | "vote:removed"
+  // Presence
+  | "presence:update";
 
 export interface DomainEventPayload {
   [key: string]: any;

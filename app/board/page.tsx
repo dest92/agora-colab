@@ -22,12 +22,17 @@ import {
   socketClient,
   type Card as ApiCard,
 } from "@/app/_lib/api";
+import { usersApi } from "@/app/_lib/api/users";
 
 interface User {
   name: string;
   emoji: string;
   color: string;
+  id?: string; // Add id field
 }
+
+// Cache for user info
+const userCache = new Map<string, { email: string; name: string }>();
 
 interface Comment {
   id: string;
@@ -56,7 +61,26 @@ const getCurrentUser = (): User => {
     name: user?.email?.split("@")[0] || "User",
     emoji: "👤",
     color: "#00AFF0",
+    id: user?.id || undefined,
   };
+};
+
+// Helper to get user display name from ID
+const getUserDisplayName = async (userId: string): Promise<string> => {
+  // Check cache first
+  if (userCache.has(userId)) {
+    return userCache.get(userId)!.name;
+  }
+
+  try {
+    const user = await usersApi.getUser(userId);
+    const displayName = user.email?.split("@")[0] || userId.substring(0, 8);
+    userCache.set(userId, { email: user.email, name: displayName });
+    return displayName;
+  } catch (error) {
+    console.error("Failed to fetch user:", error);
+    return userId.substring(0, 8) + "...";
+  }
 };
 
 const COLUMNS = [
@@ -105,21 +129,26 @@ export default function BoardPage() {
 
     // Load lanes first, then cards (to ensure proper mapping)
     const initializeBoard = async () => {
-      await loadLanes(selectedBoard);
-      await loadCards(selectedBoard);
+      const loadedLanes = await loadLanes(selectedBoard);
+      await loadCards(selectedBoard, loadedLanes);
     };
     initializeBoard();
 
     // Connect WebSocket
+    const currentUserId = authApi.getCurrentUser()?.id;
     socketClient.connect({
       boardId: selectedBoard,
       workspaceId: selectedWorkspace,
+      userId: currentUserId || undefined,
     });
 
     // Listen to card events
     socketClient.on("card:created", handleCardCreated);
     socketClient.on("card:updated", handleCardUpdated);
     socketClient.on("card:moved", handleCardMoved);
+
+    // Listen to presence events
+    socketClient.on("presence:update", handlePresenceUpdate);
 
     return () => {
       socketClient.disconnect();
@@ -129,38 +158,62 @@ export default function BoardPage() {
   const loadLanes = async (boardId: string) => {
     try {
       const lanesData = await boardsApi.getLanes(boardId);
-      setLanes(lanesData.map((lane) => ({ id: lane.id, name: lane.name })));
+      const mappedLanes = lanesData.map((lane) => ({
+        id: lane.id,
+        name: lane.name,
+      }));
+      setLanes(mappedLanes);
       console.log("✅ Lanes loaded:", lanesData);
+      return mappedLanes; // Return lanes so we can use them immediately
     } catch (error) {
       console.error("Failed to load lanes:", error);
+      return [];
     }
   };
 
-  const loadCards = async (boardId: string) => {
+  const loadCards = async (
+    boardId: string,
+    currentLanes: { id: string; name: string }[]
+  ) => {
     try {
       setLoading(true);
       const apiCards = await boardsApi.listCards(boardId);
 
-      // Get current lanes from state
-      setLanes((currentLanes) => {
-        console.log("📥 Loading cards:", {
-          count: apiCards.length,
-          lanesAvailable: currentLanes.length,
-          lanes: currentLanes,
-        });
+      console.log("📥 Loading cards:", {
+        count: apiCards.length,
+        lanesAvailable: currentLanes.length,
+        lanes: currentLanes,
+      });
 
-        // Transform API cards to UI cards using current lanes
-        const uiCards: Card[] = apiCards.map((apiCard) => {
+      const currentUserId = authApi.getCurrentUser()?.id;
+
+      // Transform API cards to UI cards
+      const uiCards: Card[] = await Promise.all(
+        apiCards.map(async (apiCard) => {
           const column = mapLaneToColumnWithLanes(apiCard.laneId, currentLanes);
           console.log("🗺️ Mapping card:", {
             cardId: apiCard.id,
             laneId: apiCard.laneId,
             mappedColumn: column,
           });
+
+          const isCurrentUser = apiCard.authorId === currentUserId;
+
+          // Get author display name
+          let authorName = "You";
+          if (!isCurrentUser) {
+            authorName = await getUserDisplayName(apiCard.authorId);
+          }
+
           return {
             id: apiCard.id,
             content: apiCard.content,
-            author: getCurrentUser(), // TODO: Get from authors API when available
+            author: {
+              name: authorName,
+              email: apiCard.authorId, // Store full ID
+              emoji: isCurrentUser ? "👤" : "👥",
+              color: isCurrentUser ? "#00AFF0" : "#999999",
+            },
             column,
             priority: apiCard.priority, // Use backend priority directly
             likes: [],
@@ -169,13 +222,11 @@ export default function BoardPage() {
             timestamp: new Date(apiCard.createdAt).getTime(),
             tags: [],
           };
-        });
+        })
+      );
 
-        console.log("✅ Cards loaded and mapped:", uiCards.length);
-        setCards(uiCards);
-
-        return currentLanes; // Return unchanged lanes
-      });
+      console.log("✅ Cards loaded and mapped:", uiCards.length);
+      setCards(uiCards);
     } catch (error) {
       console.error("❌ Failed to load cards:", error);
     } finally {
@@ -219,31 +270,72 @@ export default function BoardPage() {
     return lane?.id;
   };
 
-  const handleCardCreated = (payload: any) => {
-    console.log("Card created event:", payload);
-    // Reload cards when a new card is created
+  const handleCardCreated = async (payload: any) => {
+    console.log("🔔 Card created event:", payload);
+
+    // Check if card already exists in UI (from optimistic update)
+    const cardExists = cards.some((c) => c.id === payload.cardId);
+
+    if (cardExists) {
+      console.log("✅ Card already in UI (optimistic update)");
+      return;
+    }
+
+    console.log("🔄 Reloading cards (new card from other user)");
+    // Reload cards when a new card is created by another user
     if (boardId) {
-      loadCards(boardId);
+      loadCards(boardId, lanes);
     }
   };
 
-  const handleCardUpdated = (payload: any) => {
-    console.log("Card updated event:", payload);
-    // Reload cards when a card is updated
+  const handleCardUpdated = async (payload: any) => {
+    console.log("🔔 Card updated event:", payload);
+    // Always reload to show the latest changes from any user
     if (boardId) {
-      loadCards(boardId);
+      loadCards(boardId, lanes);
     }
   };
 
-  const handleCardMoved = (payload: any) => {
-    console.log("Card moved event:", payload);
-    // Reload cards when a card is moved
+  const handleCardMoved = async (payload: any) => {
+    console.log("🔔 Card moved event:", payload);
+    // Always reload to show the latest position from any user
     if (boardId) {
       // Force reload lanes first to ensure proper mapping
-      loadLanes(boardId).then(() => {
-        loadCards(boardId);
-      });
+      const loadedLanes = await loadLanes(boardId);
+      await loadCards(boardId, loadedLanes);
     }
+  };
+
+  const handlePresenceUpdate = async (payload: any) => {
+    console.log("👥 Presence update:", payload);
+
+    if (!payload.users || !Array.isArray(payload.users)) {
+      console.warn("Invalid presence payload:", payload);
+      return;
+    }
+
+    // Transform presence users to UI users
+    const presenceUsers: User[] = await Promise.all(
+      payload.users.map(async (userId: string) => {
+        const currentUserId = authApi.getCurrentUser()?.id;
+        const isCurrentUser = userId === currentUserId;
+
+        if (isCurrentUser) {
+          return getCurrentUser();
+        }
+
+        const displayName = await getUserDisplayName(userId);
+        return {
+          name: displayName,
+          emoji: "👥",
+          color: "#999999",
+          id: userId,
+        };
+      })
+    );
+
+    setActiveUsers(presenceUsers);
+    console.log("✅ Active users updated:", presenceUsers.length);
   };
 
   useEffect(() => {
@@ -489,7 +581,7 @@ export default function BoardPage() {
     return matchesSearch && matchesPriority && matchesUser;
   });
 
-  const activeUsers = user ? [user] : [];
+  const [activeUsers, setActiveUsers] = useState<User[]>([]);
 
   const stats = {
     total: cards.length,

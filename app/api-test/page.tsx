@@ -14,6 +14,11 @@ import {
   type Workspace,
   type Board,
 } from "@/app/_lib/api";
+import { usersApi, type User } from "@/app/_lib/api/users";
+import type {
+  WorkspaceMember,
+  WorkspaceInvite,
+} from "@/app/_lib/api/workspaces";
 
 export default function ApiTestPage() {
   const [email, setEmail] = useState("test@example.com");
@@ -36,6 +41,16 @@ export default function ApiTestPage() {
   const [tags, setTags] = useState<Tag[]>([]);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [boards, setBoards] = useState<Board[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>(
+    []
+  );
+  const [workspaceInvites, setWorkspaceInvites] = useState<WorkspaceInvite[]>(
+    []
+  );
+  const [selectedUserIdToInvite, setSelectedUserIdToInvite] = useState("");
+  const [selectedWorkspaceForMembers, setSelectedWorkspaceForMembers] =
+    useState("");
   const [logs, setLogs] = useState<string[]>([]);
   const [isConnected, setIsConnected] = useState(false);
 
@@ -341,6 +356,76 @@ export default function ApiTestPage() {
     }
   };
 
+  // Test 10: List Users
+  const testListUsers = async () => {
+    try {
+      log("👥 Listing all registered users...");
+      const data = await usersApi.listUsers();
+      log(`✅ Found ${data.length} users`);
+      setUsers(data);
+    } catch (error) {
+      log(`❌ List users error: ${error}`);
+    }
+  };
+
+  // Test 11: Add Member to Workspace
+  const testAddMember = async () => {
+    if (!selectedWorkspaceForMembers) {
+      log("❌ Please select a workspace first");
+      return;
+    }
+    if (!selectedUserIdToInvite) {
+      log("❌ Please select a user to invite");
+      return;
+    }
+
+    try {
+      log(
+        `👥 Adding user ${selectedUserIdToInvite} to workspace ${selectedWorkspaceForMembers}...`
+      );
+      const result = await workspacesApi.addMember(
+        selectedWorkspaceForMembers,
+        { userId: selectedUserIdToInvite }
+      );
+      log(
+        `✅ Member ${result.added ? "added successfully" : "already exists"}`
+      );
+      // Reload members list
+      await testListMembers();
+    } catch (error) {
+      log(`❌ Add member error: ${error}`);
+    }
+  };
+
+  // Test 12: List Workspace Members
+  const testListMembers = async () => {
+    if (!selectedWorkspaceForMembers) {
+      log("❌ Please select a workspace first");
+      return;
+    }
+
+    try {
+      log(`👥 Listing members of workspace ${selectedWorkspaceForMembers}...`);
+      const data = await workspacesApi.listMembers(selectedWorkspaceForMembers);
+      log(`✅ Found ${data.length} members`);
+      setWorkspaceMembers(data);
+    } catch (error) {
+      log(`❌ List members error: ${error}`);
+    }
+  };
+
+  // Test 13: List Workspace Invitations
+  const testListInvites = async () => {
+    try {
+      log(`📨 Listing workspace invitations...`);
+      const data = await workspacesApi.listInvites();
+      log(`✅ Found ${data.length} invitations`);
+      setWorkspaceInvites(data);
+    } catch (error) {
+      log(`❌ List invites error: ${error}`);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-linear-to-br from-gray-900 via-purple-900 to-gray-900 p-8">
       <div className="max-w-7xl mx-auto">
@@ -623,6 +708,210 @@ export default function ApiTestPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Workspace Members */}
+        {isAuthenticated && (
+          <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 mb-6">
+            <h2 className="text-xl font-bold text-white mb-4">
+              👥 Workspace Members
+            </h2>
+
+            <div className="space-y-4">
+              {/* Load Users Button */}
+              <button
+                onClick={testListUsers}
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+              >
+                👥 Load Registered Users
+              </button>
+
+              {/* Workspace Selector */}
+              {workspaces.length > 0 && (
+                <div>
+                  <label className="block text-white text-sm font-medium mb-2">
+                    Select Workspace
+                  </label>
+                  <select
+                    value={selectedWorkspaceForMembers}
+                    onChange={(e) => {
+                      setSelectedWorkspaceForMembers(e.target.value);
+                      log(
+                        `📌 Selected workspace for members: ${e.target.value}`
+                      );
+                    }}
+                    className="w-full px-4 py-2 rounded-lg bg-white/5 text-white border border-white/20 focus:border-purple-500 focus:outline-none"
+                  >
+                    <option value="">-- Select a workspace --</option>
+                    {workspaces.map((ws) => (
+                      <option key={ws.id} value={ws.id}>
+                        {ws.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* User Selector */}
+              {users.length > 0 && selectedWorkspaceForMembers && (
+                <div>
+                  <label className="block text-white text-sm font-medium mb-2">
+                    Select User to Invite
+                  </label>
+                  <select
+                    value={selectedUserIdToInvite}
+                    onChange={(e) => setSelectedUserIdToInvite(e.target.value)}
+                    className="w-full px-4 py-2 rounded-lg bg-white/5 text-white border border-white/20 focus:border-purple-500 focus:outline-none"
+                  >
+                    <option value="">-- Select a user --</option>
+                    {users
+                      .filter((user) => user.id !== currentUser?.id)
+                      .map((user) => (
+                        <option key={user.id} value={user.id}>
+                          {user.email}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Invite Button */}
+              {selectedWorkspaceForMembers && selectedUserIdToInvite && (
+                <button
+                  onClick={testAddMember}
+                  className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded-lg transition"
+                >
+                  ➕ Invite User to Workspace
+                </button>
+              )}
+
+              {/* List Members Button */}
+              {selectedWorkspaceForMembers && (
+                <button
+                  onClick={testListMembers}
+                  className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2 px-4 rounded-lg transition"
+                >
+                  📋 List Workspace Members
+                </button>
+              )}
+
+              {/* Members List */}
+              {workspaceMembers.length > 0 && (
+                <div className="bg-white/5 rounded-lg p-4">
+                  <p className="text-white font-medium mb-2">
+                    Members ({workspaceMembers.length}):
+                  </p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {workspaceMembers.map((member) => (
+                      <div
+                        key={member.userId}
+                        className="bg-white/10 rounded p-2"
+                      >
+                        <p className="text-white font-mono text-sm">
+                          {member.userId}
+                        </p>
+                        <p className="text-gray-400 text-xs">
+                          Role: {member.role} • Joined:{" "}
+                          {new Date(member.joinedAt).toLocaleDateString()}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Available Users List */}
+              {users.length > 0 && (
+                <div className="bg-white/5 rounded-lg p-4">
+                  <p className="text-white font-medium mb-2">
+                    Available Users ({users.length}):
+                  </p>
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {users.map((user) => (
+                      <div
+                        key={user.id}
+                        className={`bg-white/10 rounded p-2 ${
+                          user.id === currentUser?.id ? "opacity-50" : ""
+                        }`}
+                      >
+                        <p className="text-white font-semibold">
+                          {user.email.split("@")[0]}
+                          {user.id === currentUser?.id && (
+                            <span className="text-green-400 ml-2">(You)</span>
+                          )}
+                        </p>
+                        <p className="text-gray-400 text-xs">{user.email}</p>
+                        <p className="text-gray-500 text-xs font-mono">
+                          {user.id}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Workspace Invitations */}
+        {isAuthenticated && (
+          <div className="bg-white/10 backdrop-blur-lg rounded-xl p-6 mb-6">
+            <h2 className="text-xl font-bold text-white mb-4">
+              📨 My Workspace Invitations
+            </h2>
+
+            <div className="space-y-4">
+              <button
+                onClick={testListInvites}
+                className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 px-4 rounded-lg transition"
+              >
+                📨 Load My Invitations
+              </button>
+
+              {workspaceInvites.length > 0 && (
+                <div className="bg-white/5 rounded-lg p-4">
+                  <p className="text-white font-medium mb-2">
+                    Workspaces where you are member ({workspaceInvites.length}
+                    ):
+                  </p>
+                  <div className="space-y-2 max-h-60 overflow-y-auto">
+                    {workspaceInvites.map((invite) => (
+                      <div
+                        key={invite.workspaceId}
+                        className="bg-white/10 rounded p-3"
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-white font-semibold text-lg">
+                            {invite.workspaceName}
+                          </p>
+                          <span className="bg-blue-600 text-white text-xs px-2 py-1 rounded">
+                            {invite.role}
+                          </span>
+                        </div>
+                        <p className="text-gray-400 text-sm mb-1">
+                          Workspace ID: {invite.workspaceId}
+                        </p>
+                        <p className="text-gray-400 text-xs">
+                          Joined:{" "}
+                          {new Date(invite.joinedAt).toLocaleDateString()} •
+                          Owner: {invite.ownerId.substring(0, 8)}...
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {workspaceInvites.length === 0 && (
+                <div className="bg-white/5 rounded-lg p-4 text-center">
+                  <p className="text-gray-400">
+                    No invitations yet. Ask someone to invite you to their
+                    workspace!
+                  </p>
                 </div>
               )}
             </div>

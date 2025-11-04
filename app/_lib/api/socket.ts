@@ -26,6 +26,7 @@ class SocketClient {
     boardId?: string;
     workspaceId?: string;
     sessionId?: string;
+    userId?: string;
   }): Socket {
     if (this.socket?.connected) {
       console.warn("Socket already connected");
@@ -37,6 +38,7 @@ class SocketClient {
         boardId: options?.boardId,
         workspaceId: options?.workspaceId,
         sessionId: options?.sessionId,
+        userId: options?.userId,
       },
       transports: ["websocket", "polling"],
       reconnection: true,

@@ -40,13 +40,29 @@ export default function DashboardPage() {
   const loadWorkspaces = async () => {
     try {
       setLoading(true);
-      const data = await workspacesApi.listWorkspaces();
-      setWorkspaces(data);
+
+      // Load both owned workspaces and invited workspaces
+      const [ownedWorkspaces, invitedWorkspaces] = await Promise.all([
+        workspacesApi.listWorkspaces(),
+        workspacesApi.listInvites(),
+      ]);
+
+      // Transform invited workspaces to match Workspace interface
+      const invitedAsWorkspaces = invitedWorkspaces.map((invite) => ({
+        id: invite.workspaceId,
+        name: `${invite.workspaceName} (${invite.role})`,
+        ownerId: invite.ownerId,
+        createdAt: invite.joinedAt,
+      }));
+
+      // Combine both lists
+      const allWorkspaces = [...ownedWorkspaces, ...invitedAsWorkspaces];
+      setWorkspaces(allWorkspaces);
 
       // Auto-select first workspace if available
-      if (data.length > 0 && !selectedWorkspaceId) {
-        setSelectedWorkspaceId(data[0].id);
-        loadBoards(data[0].id);
+      if (allWorkspaces.length > 0 && !selectedWorkspaceId) {
+        setSelectedWorkspaceId(allWorkspaces[0].id);
+        loadBoards(allWorkspaces[0].id);
       }
     } catch (error) {
       console.error("Failed to load workspaces:", error);
@@ -57,10 +73,14 @@ export default function DashboardPage() {
 
   const loadBoards = async (workspaceId: string) => {
     try {
+      console.log(`Loading boards for workspace: ${workspaceId}`);
       const data = await boardsApi.listBoards(workspaceId);
+      console.log(`Loaded ${data.length} boards:`, data);
       setBoards(data);
     } catch (error) {
       console.error("Failed to load boards:", error);
+      // Clear boards on error
+      setBoards([]);
     }
   };
 
