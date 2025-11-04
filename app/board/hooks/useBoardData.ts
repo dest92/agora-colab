@@ -4,7 +4,13 @@
  */
 
 import { useState } from "react";
-import { boardsApi, commentsApi, authApi, votesApi } from "@/app/_lib/api";
+import {
+  boardsApi,
+  commentsApi,
+  authApi,
+  votesApi,
+  assigneesApi,
+} from "@/app/_lib/api";
 import { getUserDisplayName } from "../utils/userCache";
 import { mapLaneToColumn } from "../utils/boardMappers";
 
@@ -159,6 +165,50 @@ export const useBoardData = () => {
             );
           }
 
+          // Load assignees for this card
+          let assignedTo: User | undefined = undefined;
+          try {
+            console.log(`🔄 Loading assignees for card ${apiCard.id}...`);
+            const assignees = await assigneesApi.getAssignees(
+              boardId,
+              apiCard.id
+            );
+
+            console.log(
+              `📥 Assignees response for card ${apiCard.id}:`,
+              assignees
+            );
+
+            // For now, we only support one assignee (the first one)
+            if (assignees.length > 0) {
+              const assignee = assignees[0];
+              const isAssigneeCurrentUser = assignee.userId === currentUserId;
+              let assigneeName = "You";
+              if (!isAssigneeCurrentUser) {
+                assigneeName = await getUserDisplayName(assignee.userId);
+              }
+
+              assignedTo = {
+                name: assigneeName,
+                emoji: isAssigneeCurrentUser ? "👤" : "👥",
+                color: isAssigneeCurrentUser ? "#00AFF0" : "#999999",
+                id: assignee.userId,
+              };
+
+              console.log(
+                `✅ Loaded assignee for card ${apiCard.id}:`,
+                assignedTo
+              );
+            } else {
+              console.log(`ℹ️ No assignees found for card ${apiCard.id}`);
+            }
+          } catch (error) {
+            console.error(
+              `❌ Failed to load assignees for card ${apiCard.id}:`,
+              error
+            );
+          }
+
           return {
             id: apiCard.id,
             content: apiCard.content,
@@ -173,6 +223,7 @@ export const useBoardData = () => {
             likes,
             dislikes,
             comments,
+            assignedTo,
             timestamp: new Date(apiCard.createdAt).getTime(),
             tags: [],
           };

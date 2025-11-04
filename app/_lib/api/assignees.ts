@@ -1,11 +1,20 @@
 /**
  * Assignees API - User Assignment to Cards
- * Service: Collab Service (via API Gateway)
+ * Service: Boards Service (via API Gateway)
  * Base: /boards/:boardId/cards/:cardId/assignees
  */
 
 import { apiClient } from "./client";
-import type { AssigneeAddResult, AssigneeRemoveResult } from "./types";
+
+export interface Assignee {
+  userId: string;
+  assignedAt: string;
+}
+
+export interface Assignment {
+  cardId: string;
+  assignedAt: string;
+}
 
 class AssigneesApi {
   /**
@@ -16,9 +25,10 @@ class AssigneesApi {
     boardId: string,
     cardId: string,
     userId: string
-  ): Promise<AssigneeAddResult> {
-    return apiClient.post<AssigneeAddResult>(
-      `/boards/${boardId}/cards/${cardId}/assignees/${userId}`
+  ): Promise<{ message: string; alreadyAssigned?: boolean }> {
+    return apiClient.post(
+      `/boards/${boardId}/cards/${cardId}/assignees/${userId}`,
+      {}
     );
   }
 
@@ -30,10 +40,28 @@ class AssigneesApi {
     boardId: string,
     cardId: string,
     userId: string
-  ): Promise<AssigneeRemoveResult> {
-    return apiClient.delete<AssigneeRemoveResult>(
+  ): Promise<{ message: string }> {
+    return apiClient.delete(
       `/boards/${boardId}/cards/${cardId}/assignees/${userId}`
     );
+  }
+
+  /**
+   * Get all assignees for a card
+   * GET /boards/:boardId/cards/:cardId/assignees
+   */
+  async getAssignees(boardId: string, cardId: string): Promise<Assignee[]> {
+    return apiClient.get<Assignee[]>(
+      `/boards/${boardId}/cards/${cardId}/assignees`
+    );
+  }
+
+  /**
+   * Get current user's assignments
+   * GET /boards/:boardId/assignees/me
+   */
+  async getMyAssignments(boardId: string): Promise<Assignment[]> {
+    return apiClient.get<Assignment[]>(`/boards/${boardId}/assignees/me`);
   }
 }
 

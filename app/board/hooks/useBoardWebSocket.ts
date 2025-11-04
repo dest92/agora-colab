@@ -258,6 +258,53 @@ export const useBoardWebSocket = ({
       console.log(`✅ Vote ${action} for card ${cardId} by ${voterName}`);
     };
 
+    const handleAssigneeAdded = async (payload: any) => {
+      console.log("📥 WebSocket: assignee:added", payload);
+
+      const { cardId, userId } = payload;
+
+      const currentUser = getCurrentUser();
+      const isCurrentUser = userId === currentUser?.id;
+      const assigneeName = isCurrentUser
+        ? "You"
+        : await getUserDisplayName(userId);
+
+      cardsRef.current = cardsRef.current.map((card) => {
+        if (card.id !== cardId) return card;
+
+        return {
+          ...card,
+          assignedTo: {
+            name: assigneeName,
+            emoji: isCurrentUser ? "👤" : "👥",
+            color: isCurrentUser ? "#00AFF0" : "#999999",
+            id: userId,
+          },
+        };
+      });
+
+      setCards(cardsRef.current);
+      console.log(`✅ Assignee added to card ${cardId}: ${assigneeName}`);
+    };
+
+    const handleAssigneeRemoved = (payload: any) => {
+      console.log("📥 WebSocket: assignee:removed", payload);
+
+      const { cardId } = payload;
+
+      cardsRef.current = cardsRef.current.map((card) => {
+        if (card.id !== cardId) return card;
+
+        return {
+          ...card,
+          assignedTo: undefined,
+        };
+      });
+
+      setCards(cardsRef.current);
+      console.log(`✅ Assignee removed from card ${cardId}`);
+    };
+
     const handlePresenceUpdate = async (payload: any) => {
       console.log("👥 Presence update:", payload);
 
@@ -297,6 +344,8 @@ export const useBoardWebSocket = ({
     socketClient.on("card:archived", handleCardArchived);
     socketClient.on("card:unarchived", handleCardUnarchived);
     socketClient.on("vote:changed", handleVoteChanged);
+    socketClient.on("assignee:added", handleAssigneeAdded);
+    socketClient.on("assignee:removed", handleAssigneeRemoved);
     socketClient.on("presence:update", handlePresenceUpdate);
 
     return () => {
@@ -308,6 +357,8 @@ export const useBoardWebSocket = ({
       socketClient.off("card:archived", handleCardArchived);
       socketClient.off("card:unarchived", handleCardUnarchived);
       socketClient.off("vote:changed", handleVoteChanged);
+      socketClient.off("assignee:added", handleAssigneeAdded);
+      socketClient.off("assignee:removed", handleAssigneeRemoved);
       socketClient.off("presence:update", handlePresenceUpdate);
     };
   }, [boardId, setCards, setActiveUsers, loadCards, getCurrentUser]);

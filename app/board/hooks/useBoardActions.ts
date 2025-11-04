@@ -3,7 +3,7 @@
  * Handles all board actions (create, update, delete cards, comments, etc.)
  */
 
-import { boardsApi, commentsApi, votesApi } from "@/app/_lib/api";
+import { boardsApi, commentsApi, votesApi, assigneesApi } from "@/app/_lib/api";
 import { mapColumnToLaneId } from "../utils/boardMappers";
 import type { Card, Comment, User } from "./useBoardData";
 
@@ -243,12 +243,44 @@ export const useBoardActions = ({
     );
   };
 
-  const handleAssignUser = (cardId: string, assignedUser: User | undefined) => {
+  const handleAssignUser = async (
+    cardId: string,
+    assignedUser: User | undefined
+  ) => {
+    console.log("👤 Assigning user to card:", { cardId, assignedUser });
+
+    // Optimistic update
+    const previousCards = [...cards];
     setCards(
       cards.map((card) =>
         card.id === cardId ? { ...card, assignedTo: assignedUser } : card
       )
     );
+
+    try {
+      if (assignedUser && assignedUser.id) {
+        // Assign user
+        console.log("📞 Calling API to assign user...");
+        await assigneesApi.addAssignee(boardId, cardId, assignedUser.id);
+        console.log("✅ User assigned successfully");
+      } else {
+        // Unassign user - we need to get the current assignee first
+        const currentCard = cards.find((c) => c.id === cardId);
+        if (currentCard?.assignedTo?.id) {
+          console.log("📞 Calling API to remove assignee...");
+          await assigneesApi.removeAssignee(
+            boardId,
+            cardId,
+            currentCard.assignedTo.id
+          );
+          console.log("✅ Assignee removed successfully");
+        }
+      }
+    } catch (error) {
+      console.error("❌ Failed to update assignee:", error);
+      // Revert on error
+      setCards(previousCards);
+    }
   };
 
   const handleAddTag = (cardId: string, tag: string) => {
