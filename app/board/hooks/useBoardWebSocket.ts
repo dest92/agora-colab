@@ -5,7 +5,7 @@
 
 import { useEffect, useRef } from "react";
 import { socketClient, authApi } from "@/app/_lib/api";
-import { getUserDisplayName } from "../utils/userCache";
+import { getUserInfo } from "../utils/userCache";
 import { mapLaneToColumn } from "../utils/boardMappers";
 import type { Card, Comment, User } from "./useBoardData";
 
@@ -149,14 +149,14 @@ export const useBoardWebSocket = ({
       }
 
       try {
-        const commentAuthorName = await getUserDisplayName(authorId);
+        const commentAuthorInfo = await getUserInfo(authorId);
 
         const newComment: Comment = {
           id: commentId,
           author: {
-            name: commentAuthorName,
-            emoji: "👥",
-            color: "#999999",
+            name: commentAuthorInfo.name,
+            emoji: commentAuthorInfo.emoji,
+            color: commentAuthorInfo.color,
           },
           content,
           timestamp: new Date(createdAt).getTime(),
@@ -213,8 +213,9 @@ export const useBoardWebSocket = ({
         return;
       }
 
-      // Get voter display name
-      const voterName = await getUserDisplayName(voterId);
+      // Get voter info
+      const voterInfo = await getUserInfo(voterId);
+      const voterName = voterInfo.name;
 
       // Update the card's vote counts
       setCards((prevCards) =>
@@ -265,9 +266,16 @@ export const useBoardWebSocket = ({
 
       const currentUser = getCurrentUser();
       const isCurrentUser = userId === currentUser?.id;
-      const assigneeName = isCurrentUser
-        ? "You"
-        : await getUserDisplayName(userId);
+      
+      let assigneeInfo = await getUserInfo(userId);
+      if (isCurrentUser) {
+        assigneeInfo = {
+          ...assigneeInfo,
+          name: "You",
+          emoji: "👤",
+          color: "#00AFF0"
+        };
+      }
 
       cardsRef.current = cardsRef.current.map((card) => {
         if (card.id !== cardId) return card;
@@ -275,16 +283,16 @@ export const useBoardWebSocket = ({
         return {
           ...card,
           assignedTo: {
-            name: assigneeName,
-            emoji: isCurrentUser ? "👤" : "👥",
-            color: isCurrentUser ? "#00AFF0" : "#999999",
+            name: assigneeInfo.name,
+            emoji: assigneeInfo.emoji,
+            color: assigneeInfo.color,
             id: userId,
           },
         };
       });
 
       setCards(cardsRef.current);
-      console.log(`✅ Assignee added to card ${cardId}: ${assigneeName}`);
+      console.log(`✅ Assignee added to card ${cardId}: ${assigneeInfo.name}`);
     };
 
     const handleAssigneeRemoved = (payload: any) => {
@@ -322,11 +330,11 @@ export const useBoardWebSocket = ({
             return getCurrentUser();
           }
 
-          const displayName = await getUserDisplayName(userId);
+          const userInfo = await getUserInfo(userId);
           return {
-            name: displayName,
-            emoji: "👥",
-            color: "#999999",
+            name: userInfo.name,
+            emoji: userInfo.emoji,
+            color: userInfo.color,
             id: userId,
           };
         })

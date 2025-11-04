@@ -5,10 +5,17 @@
 
 import { apiClient } from "./client";
 
+export interface UserMetadata {
+  name?: string;
+  emoji?: string;
+  color?: string;
+}
+
 export interface User {
   id: string;
   email: string;
   createdAt: string;
+  user_metadata?: UserMetadata;
 }
 
 class UsersApi {

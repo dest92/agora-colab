@@ -11,7 +11,7 @@ import {
   votesApi,
   assigneesApi,
 } from "@/app/_lib/api";
-import { getUserDisplayName } from "../utils/userCache";
+import { getUserInfo } from "../utils/userCache";
 import { mapLaneToColumn } from "../utils/boardMappers";
 
 export interface User {
@@ -94,10 +94,15 @@ export const useBoardData = () => {
 
           const isCurrentUser = apiCard.authorId === currentUserId;
 
-          // Get author display name
-          let authorName = "You";
-          if (!isCurrentUser) {
-            authorName = await getUserDisplayName(apiCard.authorId);
+          // Get author info (name, emoji, color)
+          let authorInfo = await getUserInfo(apiCard.authorId);
+          if (isCurrentUser) {
+            authorInfo = {
+              ...authorInfo,
+              name: "You",
+              emoji: "👤",
+              color: "#00AFF0"
+            };
           }
 
           // Load comments for this card
@@ -111,20 +116,24 @@ export const useBoardData = () => {
               apiComments.map(async (comment) => {
                 const isCommentAuthorCurrentUser =
                   comment.authorId === currentUserId;
-                let commentAuthorName = "You";
-                if (!isCommentAuthorCurrentUser) {
-                  commentAuthorName = await getUserDisplayName(
-                    comment.authorId
-                  );
+                
+                let commentAuthorInfo = await getUserInfo(comment.authorId);
+                if (isCommentAuthorCurrentUser) {
+                  commentAuthorInfo = {
+                    ...commentAuthorInfo,
+                    name: "You",
+                    emoji: "👤",
+                    color: "#00AFF0"
+                  };
                 }
 
                 return {
                   id: comment.id,
                   author: {
-                    name: commentAuthorName,
+                    name: commentAuthorInfo.name,
                     email: comment.authorId,
-                    emoji: isCommentAuthorCurrentUser ? "👤" : "👥",
-                    color: isCommentAuthorCurrentUser ? "#00AFF0" : "#999999",
+                    emoji: commentAuthorInfo.emoji,
+                    color: commentAuthorInfo.color,
                   },
                   content: comment.content,
                   timestamp: new Date(comment.createdAt).getTime(),
@@ -146,11 +155,11 @@ export const useBoardData = () => {
 
             // Convert voter IDs to display names
             for (const voter of voters) {
-              const voterName = await getUserDisplayName(voter.voterId);
+              const voterInfo = await getUserInfo(voter.voterId);
               if (voter.weight === 1) {
-                likes.push(voterName);
+                likes.push(voterInfo.name);
               } else if (voter.weight === -1) {
-                dislikes.push(voterName);
+                dislikes.push(voterInfo.name);
               }
             }
 
@@ -183,15 +192,21 @@ export const useBoardData = () => {
             if (assignees.length > 0) {
               const assignee = assignees[0];
               const isAssigneeCurrentUser = assignee.userId === currentUserId;
-              let assigneeName = "You";
-              if (!isAssigneeCurrentUser) {
-                assigneeName = await getUserDisplayName(assignee.userId);
+              
+              let assigneeInfo = await getUserInfo(assignee.userId);
+              if (isAssigneeCurrentUser) {
+                assigneeInfo = {
+                  ...assigneeInfo,
+                  name: "You",
+                  emoji: "👤",
+                  color: "#00AFF0"
+                };
               }
 
               assignedTo = {
-                name: assigneeName,
-                emoji: isAssigneeCurrentUser ? "👤" : "👥",
-                color: isAssigneeCurrentUser ? "#00AFF0" : "#999999",
+                name: assigneeInfo.name,
+                emoji: assigneeInfo.emoji,
+                color: assigneeInfo.color,
                 id: assignee.userId,
               };
 
@@ -213,10 +228,10 @@ export const useBoardData = () => {
             id: apiCard.id,
             content: apiCard.content,
             author: {
-              name: authorName,
+              name: authorInfo.name,
               email: apiCard.authorId,
-              emoji: isCurrentUser ? "👤" : "👥",
-              color: isCurrentUser ? "#00AFF0" : "#999999",
+              emoji: authorInfo.emoji,
+              color: authorInfo.color,
             },
             column,
             priority: apiCard.priority,

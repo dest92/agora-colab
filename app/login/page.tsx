@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { authApi } from "@/app/_lib/api";
+import DecryptedText from "@/app/_components/ui/decrypted-text";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -34,7 +35,17 @@ export default function LoginPage() {
       <div className="w-full max-w-md">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-5xl font-light text-white mb-2">hello</h1>
+          <h1 className="text-5xl font-light text-white mb-2">
+            <DecryptedText
+              text="agora colab"
+              speed={30}
+              sequential={true}
+              revealDirection="start"
+              animateOn="view"
+              className="text-white"
+              encryptedClassName="text-white/40"
+            />
+          </h1>
           <p className="text-white/60 uppercase text-xs tracking-wider">
             SIGN IN TO CONTINUE
           </p>
@@ -105,14 +116,48 @@ export default function LoginPage() {
             <p className="text-white/80 text-xs uppercase tracking-wider">
               COLLABORATIVE
             </p>
-            <p className="text-white text-sm font-light">decision platform</p>
+            <p className="text-white text-sm font-light">
+              <DecryptedText
+                text="decision platform"
+                speed={40}
+                maxIterations={8}
+                animateOn="hover"
+                className="text-white"
+                encryptedClassName="text-white/50"
+              />
+            </p>
           </div>
           <div className="bg-[#E3008C] p-4">
             <p className="text-white/80 text-xs uppercase tracking-wider">
               REAL-TIME
             </p>
-            <p className="text-white text-sm font-light">teamwork</p>
+            <p className="text-white text-sm font-light">
+              <DecryptedText
+                text="teamwork"
+                speed={40}
+                maxIterations={8}
+                animateOn="hover"
+                className="text-white"
+                encryptedClassName="text-white/50"
+              />
+            </p>
           </div>
+        </div>
+
+        {/* Additional animated text */}
+        <div className="mt-8 text-center">
+          <p className="text-white/40 text-xs uppercase tracking-widest">
+            <DecryptedText
+              text="collaborate • decide • execute"
+              speed={25}
+              sequential={true}
+              revealDirection="center"
+              animateOn="view"
+              className="text-white/60"
+              encryptedClassName="text-white/20"
+              characters="▓▒░█▄▀"
+            />
+          </p>
         </div>
       </div>
     </main>
