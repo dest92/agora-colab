@@ -31,8 +31,8 @@ export default function LoginPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4 bg-[#1e1e1e]">
-      <div className="w-full max-w-md">
+    <main className="min-h-screen flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8 bg-[#1e1e1e]">
+      <div className="w-full max-w-sm sm:max-w-md lg:max-w-lg">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-5xl font-light text-white mb-2">
@@ -62,7 +62,7 @@ export default function LoginPage() {
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full bg-white/20 border-2 border-white/40 text-white px-4 py-3 text-lg focus:outline-none focus:border-white rounded-none placeholder:text-white/50"
+              className="w-full bg-white/20 border-2 border-white/40 text-white px-3 sm:px-4 py-2 sm:py-3 text-base sm:text-lg focus:outline-none focus:border-white rounded-none placeholder:text-white/50"
               placeholder="your email"
               required
             />
@@ -77,7 +77,7 @@ export default function LoginPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-white/20 border-2 border-white/40 text-white px-4 py-3 text-lg focus:outline-none focus:border-white rounded-none placeholder:text-white/50"
+              className="w-full bg-white/20 border-2 border-white/40 text-white px-3 sm:px-4 py-2 sm:py-3 text-base sm:text-lg focus:outline-none focus:border-white rounded-none placeholder:text-white/50"
               placeholder="your password"
               required
             />
@@ -103,7 +103,7 @@ export default function LoginPage() {
             </button>
             <Link
               href="/register"
-              className="bg-[#FA6800] p-6 text-white font-light text-xl hover:bg-[#E05E00] transition-colors flex items-center justify-center"
+              className="bg-[#FA6800] p-4 sm:p-6 md:p-8 text-white font-light text-base sm:text-xl md:text-2xl hover:bg-[#E05E00] transition-colors flex items-center justify-center active:scale-95"
             >
               register
             </Link>

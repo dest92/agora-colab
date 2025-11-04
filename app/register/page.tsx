@@ -63,8 +63,8 @@ export default function RegisterPage() {
   };
 
   return (
-    <main className="min-h-screen flex items-center justify-center p-4 bg-[#1e1e1e]">
-      <div className="w-full max-w-2xl">
+    <main className="min-h-screen flex items-center justify-center p-2 sm:p-4 md:p-6 lg:p-8 bg-[#1e1e1e]">
+      <div className="w-full max-w-sm sm:max-w-xl md:max-w-2xl">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-5xl font-light text-white mb-2">
@@ -77,7 +77,7 @@ export default function RegisterPage() {
 
         {/* Register Form */}
         <form onSubmit={handleRegister} className="space-y-0">
-          <div className="grid grid-cols-2 gap-1 mb-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mb-1">
             {/* Name Tile */}
             <div className="bg-[#0078D7] p-6">
               <label className="block text-white/80 uppercase text-xs tracking-wider mb-3">
@@ -87,7 +87,7 @@ export default function RegisterPage() {
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                className="w-full bg-white/20 border-2 border-white/40 text-white px-4 py-3 text-lg focus:outline-none focus:border-white rounded-none placeholder:text-white/50"
+                className="w-full bg-white/20 border-2 border-white/40 text-white px-3 sm:px-4 py-2 sm:py-3 text-base sm:text-lg focus:outline-none focus:border-white rounded-none placeholder:text-white/50"
                 placeholder="enter name"
                 required
                 disabled={loading}
@@ -103,7 +103,7 @@ export default function RegisterPage() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full bg-white/20 border-2 border-white/40 text-white px-4 py-3 text-lg focus:outline-none focus:border-white rounded-none placeholder:text-white/50"
+                className="w-full bg-white/20 border-2 border-white/40 text-white px-3 sm:px-4 py-2 sm:py-3 text-base sm:text-lg focus:outline-none focus:border-white rounded-none placeholder:text-white/50"
                 placeholder="your email"
                 required
                 disabled={loading}
@@ -185,7 +185,7 @@ export default function RegisterPage() {
           )}
 
           {/* Action Tiles */}
-          <div className="grid grid-cols-2 gap-1 mt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 mt-1">
             <button
               type="submit"
               disabled={loading}
@@ -195,7 +195,7 @@ export default function RegisterPage() {
             </button>
             <Link
               href="/login"
-              className="bg-[#E3008C] p-6 text-white font-light text-xl hover:bg-[#D1007D] transition-colors flex items-center justify-center"
+              className="bg-[#E3008C] p-4 sm:p-6 md:p-8 text-white font-light text-base sm:text-xl md:text-2xl hover:bg-[#D1007D] transition-colors flex items-center justify-center active:scale-95"
             >
               back to login
             </Link>
