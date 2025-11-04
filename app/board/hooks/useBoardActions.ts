@@ -29,26 +29,66 @@ export const useBoardActions = ({
   ) => {
     if (!user || !boardId) return;
 
+    const laneId = mapColumnToLaneId(columnId, lanes);
+
+    if (!laneId) {
+      console.error("❌ Cannot find lane ID for column:", columnId);
+      return;
+    }
+
+    // Generate temporary ID for optimistic update
+    const tempId = `temp-${Date.now()}`;
+
+    // Optimistic update: Add card to local state IMMEDIATELY
+    const optimisticCard: Card = {
+      id: tempId,
+      content,
+      author: user,
+      column: columnId,
+      priority,
+      likes: [],
+      dislikes: [],
+      comments: [],
+      timestamp: Date.now(),
+      tags: [],
+    };
+
+    setCards((prevCards) => [...prevCards, optimisticCard]);
+
+    console.log("✅ Card added optimistically with temp ID:", tempId);
+
+    // Then make the API call in the background
     try {
-      const laneId = mapColumnToLaneId(columnId, lanes);
+      console.log("📝 Creating card in backend:", { columnId, laneId, content, priority });
 
-      if (!laneId) {
-        console.error("❌ Cannot find lane ID for column:", columnId);
-        return;
-      }
-
-      console.log("📝 Creating card:", { columnId, laneId, content, priority });
-
-      await boardsApi.createCard(boardId, {
+      const newCard = await boardsApi.createCard(boardId, {
         content,
         priority,
         position: 1000,
         laneId,
       });
 
-      console.log("✅ Card created in lane:", laneId);
+      // Replace temp card with real card from backend
+      setCards((prevCards) =>
+        prevCards.map((card) =>
+          card.id === tempId
+            ? {
+                ...card,
+                id: newCard.id,
+                timestamp: new Date(newCard.createdAt).getTime(),
+              }
+            : card
+        )
+      );
+
+      console.log("✅ Card created in backend, temp ID replaced:", {
+        tempId,
+        realId: newCard.id,
+      });
     } catch (error) {
       console.error("❌ Failed to create card:", error);
+      // Remove the optimistic card on error
+      setCards((prevCards) => prevCards.filter((card) => card.id !== tempId));
     }
   };
 

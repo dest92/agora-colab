@@ -59,10 +59,13 @@ export const useBoardData = () => {
 
   const loadCards = async (
     boardId: string,
-    currentLanes: { id: string; name: string }[]
+    currentLanes: { id: string; name: string }[],
+    showLoading: boolean = true
   ) => {
     try {
-      setLoading(true);
+      if (showLoading) {
+        setLoading(true);
+      }
       const apiCards = await boardsApi.listCards(boardId);
 
       console.log("📥 Loading cards:", {
@@ -154,7 +157,9 @@ export const useBoardData = () => {
     } catch (error) {
       console.error("❌ Failed to load cards:", error);
     } finally {
-      setLoading(false);
+      if (showLoading) {
+        setLoading(false);
+      }
     }
   };
 
