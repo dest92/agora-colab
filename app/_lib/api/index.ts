@@ -18,7 +18,14 @@ export { tagsApi } from "./tags";
 export { assigneesApi } from "./assignees";
 export { commentsApi } from "./comments";
 export { workspacesApi } from "./workspaces";
-export type { Workspace, CreateWorkspaceDto } from "./workspaces";
+export type {
+  Workspace,
+  CreateWorkspaceDto,
+  WorkspaceMember,
+  AddMemberDto,
+  WorkspaceInvite,
+  SearchUserResult,
+} from "./workspaces";
 export { sessionsApi } from "./sessions";
 export type { Session, CreateSessionDto } from "./sessions";
 

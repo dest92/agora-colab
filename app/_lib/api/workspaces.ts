@@ -19,6 +19,8 @@ export interface CreateWorkspaceDto {
 
 export interface WorkspaceMember {
   userId: string;
+  email: string | null;
+  name: string;
   role: string;
   joinedAt: string;
 }
@@ -33,6 +35,12 @@ export interface WorkspaceInvite {
   ownerId: string;
   role: string;
   joinedAt: string;
+}
+
+export interface SearchUserResult {
+  id: string;
+  email: string;
+  name: string;
 }
 
 class WorkspacesApi {
@@ -82,6 +90,19 @@ class WorkspacesApi {
    */
   async listInvites(): Promise<WorkspaceInvite[]> {
     return apiClient.get<WorkspaceInvite[]>("/workspaces/invites/list");
+  }
+
+  /**
+   * Search users by email or name
+   * GET /workspaces/users/search?q=query
+   */
+  async searchUsers(query: string): Promise<SearchUserResult[]> {
+    if (!query || query.trim().length < 2) {
+      return [];
+    }
+    return apiClient.get<SearchUserResult[]>(
+      `/workspaces/users/search?q=${encodeURIComponent(query)}`
+    );
   }
 }
 

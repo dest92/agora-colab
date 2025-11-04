@@ -18,6 +18,11 @@ export interface AuthResponse {
 export interface RegisterDto {
   email: string;
   password: string;
+  metadata?: {
+    name?: string;
+    emoji?: string;
+    color?: string;
+  };
 }
 
 export interface LoginDto {
