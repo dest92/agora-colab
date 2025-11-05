@@ -25,9 +25,11 @@ export function NotificationBell() {
     }, 30000);
 
     // Listen for real-time notifications
-    const handleNotificationCreated = (payload: DomainEventPayload) => {
+    const handleNotificationCreated = (payload: unknown) => {
+      console.log("New notification received:", payload);
+
+      // Cast payload to Notification type
       const notification = payload as Notification;
-      console.log("🔔 New notification received:", notification);
 
       // Add to notifications list
       setNotifications((prev) => [notification, ...prev]);
@@ -119,6 +121,8 @@ export function NotificationBell() {
     switch (type) {
       case "comment":
         return "💬";
+      case "workspace_invitation":
+        return "🤝";
       case "invite":
         return "📨";
       case "assignment":
@@ -193,7 +197,7 @@ export function NotificationBell() {
                   }`}
                 >
                   <div className="flex items-start gap-3">
-                    <span className="text-2xl flex-shrink-0">
+                    <span className="text-2xl shrink-0">
                       {getNotificationIcon(notification.type)}
                     </span>
                     <div className="flex-1 min-w-0">
@@ -204,7 +208,7 @@ export function NotificationBell() {
                         {!notification.readAt && (
                           <button
                             onClick={() => handleMarkAsRead(notification.id)}
-                            className="text-[#00AFF0] hover:text-white transition-colors flex-shrink-0"
+                            className="text-[#00AFF0] hover:text-white transition-colors shrink-0"
                             title="Mark as read"
                           >
                             <Check className="w-4 h-4" />

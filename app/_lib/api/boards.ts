@@ -85,6 +85,42 @@ class BoardsApi {
     return apiClient.get<Lane[]>(`/boards/${boardId}/lanes`);
   }
 
+  /**
+   * Create a new lane in a board
+   * POST /boards/:boardId/lanes
+   */
+  async createLane(boardId: string, name: string): Promise<Lane> {
+    return apiClient.post<Lane>(`/boards/${boardId}/lanes`, { name });
+  }
+
+  /**
+   * Update lane position
+   * PATCH /boards/:boardId/lanes/:laneId/position
+   */
+  async updateLanePosition(
+    boardId: string,
+    laneId: string,
+    position: number
+  ): Promise<{ updated: boolean }> {
+    return apiClient.patch<{ updated: boolean }>(
+      `/boards/${boardId}/lanes/${laneId}/position`,
+      { position }
+    );
+  }
+
+  /**
+   * Delete a lane (column)
+   * DELETE /boards/:boardId/lanes/:laneId
+   */
+  async deleteLane(
+    boardId: string,
+    laneId: string
+  ): Promise<{ deleted: boolean }> {
+    return apiClient.delete<{ deleted: boolean }>(
+      `/boards/${boardId}/lanes/${laneId}`
+    );
+  }
+
   // ===== Card Management =====
   /**
    * Create a new card in a board

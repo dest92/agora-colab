@@ -60,8 +60,27 @@ export const useBoardWebSocket = ({
       userId: currentUserId || undefined,
     });
 
+    // Ensure we explicitly join the board/workspace room if the socket was
+    // already connected (connect() will emit join when already connected,
+    // but calling join here is idempotent and acts as a safe guarantee).
+    if (socketClient.isConnected()) {
+      try {
+        socketClient.join({ boardId, workspaceId });
+      } catch (e) {
+        console.warn("Failed to emit join from useBoardWebSocket:", e);
+      }
+    }
+
     return () => {
-      socketClient.disconnect();
+      // Leave the board room when unmounting or changing board
+      console.log(`Leaving board ${boardId} and workspace ${workspaceId}`);
+      try {
+        socketClient.leave({ boardId, workspaceId });
+      } catch (e) {
+        console.warn("Failed to emit leave from useBoardWebSocket:", e);
+      }
+      // Don't disconnect the socket - we might still be in the workspace
+      // socketClient.disconnect();
     };
   }, [boardId, workspaceId]);
 
@@ -72,7 +91,7 @@ export const useBoardWebSocket = ({
     console.log("🔌 Registering WebSocket event listeners");
 
     const handleCardCreated = async (payload: any) => {
-      console.log("🔔 Card created event:", payload);
+      console.log("Card created event:", payload);
 
       const { cardId, authorId } = payload;
 
@@ -80,7 +99,7 @@ export const useBoardWebSocket = ({
       const currentUserId = authApi.getCurrentUser()?.id;
       if (authorId === currentUserId) {
         console.log(
-          "✅ Card created by current user (optimistic update already applied)"
+          "Card created by current user (optimistic update already applied)"
         );
         return;
       }
@@ -89,11 +108,11 @@ export const useBoardWebSocket = ({
       const cardExists = cardsRef.current.some((c) => c.id === cardId);
 
       if (cardExists) {
-        console.log("✅ Card already in UI");
+        console.log("Card already in UI");
         return;
       }
 
-      console.log("🔄 Reloading cards (new card from other user)");
+      console.log("Reloading cards (new card from other user)");
       if (boardId) {
         loadCards(boardId, lanesRef.current, false); // false = don't show loading
       }
@@ -110,14 +129,14 @@ export const useBoardWebSocket = ({
     };
 
     const handleCardMoved = async (payload: any) => {
-      console.log("🔔 Card moved event:", payload);
+      console.log("Card moved event:", payload);
 
       const { cardId, targetLaneId, userId } = payload;
 
       const currentUserId = authApi.getCurrentUser()?.id;
       if (userId === currentUserId) {
         console.log(
-          "✅ Card moved by current user (optimistic update already applied)"
+          "Card moved by current user (optimistic update already applied)"
         );
         return;
       }
@@ -133,7 +152,7 @@ export const useBoardWebSocket = ({
       );
 
       console.log(
-        `✅ Card ${cardId} moved to column ${targetColumn} by another user`
+        `Card ${cardId} moved to column ${targetColumn} by another user`
       );
     };
 
@@ -144,7 +163,7 @@ export const useBoardWebSocket = ({
 
       const currentUserId = authApi.getCurrentUser()?.id;
       if (authorId === currentUserId) {
-        console.log("✅ Comment already in UI (optimistic update)");
+        console.log("Comment already in UI (optimistic update)");
         return;
       }
 
@@ -171,45 +190,43 @@ export const useBoardWebSocket = ({
           })
         );
 
-        console.log("✅ Comment added from another user");
+        console.log("Comment added from another user");
       } catch (error) {
-        console.error("❌ Failed to add comment:", error);
+        console.error("Failed to add comment:", error);
       }
     };
 
     const handleCardArchived = async (payload: any) => {
-      console.log("🔔 Card archived event:", payload);
+      console.log("Card archived event:", payload);
 
       const { cardId } = payload;
 
       // Remove the archived card from the UI
       setCards((prevCards) => prevCards.filter((card) => card.id !== cardId));
 
-      console.log(`✅ Card ${cardId} archived and removed from UI`);
+      console.log(`Card ${cardId} archived and removed from UI`);
     };
 
     const handleCardUnarchived = async (payload: any) => {
-      console.log("🔔 Card unarchived event:", payload);
+      console.log("Card unarchived event:", payload);
 
       // Reload cards to show the unarchived card
       if (boardId) {
         loadCards(boardId, lanesRef.current, false); // false = don't show loading
       }
 
-      console.log("✅ Cards reloaded after unarchive");
+      console.log("Cards reloaded after unarchive");
     };
 
     const handleVoteChanged = async (payload: any) => {
-      console.log("🔔 Vote changed event:", payload);
+      console.log("Vote changed event:", payload);
 
       const { cardId, voterId, action, summary } = payload;
 
       // Check if the vote was made by the current user
       const currentUserId = authApi.getCurrentUser()?.id;
       if (voterId === currentUserId) {
-        console.log(
-          "✅ Vote by current user (optimistic update already applied)"
-        );
+        console.log("Vote by current user (optimistic update already applied)");
         return;
       }
 
@@ -256,7 +273,7 @@ export const useBoardWebSocket = ({
         })
       );
 
-      console.log(`✅ Vote ${action} for card ${cardId} by ${voterName}`);
+      console.log(`Vote ${action} for card ${cardId} by ${voterName}`);
     };
 
     const handleAssigneeAdded = async (payload: any) => {
@@ -310,7 +327,7 @@ export const useBoardWebSocket = ({
       });
 
       setCards(cardsRef.current);
-      console.log(`✅ Assignee removed from card ${cardId}`);
+      console.log(`Assignee removed from card ${cardId}`);
     };
 
     const handlePresenceUpdate = async (payload: any) => {
@@ -341,7 +358,108 @@ export const useBoardWebSocket = ({
       );
 
       setActiveUsers(presenceUsers);
-      console.log("✅ Active users updated:", presenceUsers.length);
+      console.log("Active users updated:", presenceUsers.length);
+    };
+
+    const handleLaneCreated = async (payload: any) => {
+      console.log("Lane created event:", payload);
+
+      const { laneId } = payload;
+
+      // Check if the lane already exists in current state
+      const laneExists = lanesRef.current.some((l) => l.id === laneId);
+
+      if (laneExists) {
+        console.log("Lane already in UI (optimistic update)");
+        return;
+      }
+
+      // Reload lanes to show the new lane (for other users)
+      if (boardId) {
+        await loadLanes(boardId);
+      }
+
+      console.log("Lanes updated after lane creation");
+    };
+
+    const handleLaneUpdated = async (payload: any) => {
+      console.log("Lane updated event:", payload);
+
+      // Reload lanes to show the updated positions
+      if (boardId) {
+        await loadLanes(boardId);
+      }
+
+      console.log("Lanes reloaded after lane update");
+    };
+
+    const handleLaneDeleted = async (payload: any) => {
+      console.log("Lane deleted event:", payload);
+
+      const { laneId } = payload;
+
+      console.log("Current state before reload:", {
+        lanesCount: lanesRef.current.length,
+        cardsCount: cardsRef.current.length,
+        laneToDelete: lanesRef.current.find((l) => l.id === laneId),
+      });
+
+      // Reload lanes first to get the updated list
+      if (boardId) {
+        const updatedLanes = await loadLanes(boardId);
+        console.log("Lanes after reload:", {
+          count: updatedLanes.length,
+          lanes: updatedLanes,
+        });
+
+        // Then reload cards with the updated lanes
+        // This will automatically filter out cards from the deleted lane
+        await loadCards(boardId, updatedLanes, false);
+
+        console.log("Cards after reload:", {
+          count: cardsRef.current.length,
+        });
+      }
+
+      const handleLaneDeleted = async (payload: any) => {
+        console.log("LANE DELETED EVENT RECEIVED");
+        console.log("Lane deleted event:", payload);
+
+        const { laneId } = payload;
+
+        // Check if the lane still exists in current state
+        const laneExists = lanesRef.current.some((l) => l.id === laneId);
+
+        if (!laneExists) {
+          console.log("Lane already removed from UI (optimistic update)");
+          return;
+        }
+
+        console.log("Current state before update:", {
+          lanesCount: lanesRef.current.length,
+          cardsCount: cardsRef.current.length,
+        });
+
+        // Remove cards from the deleted lane immediately
+        const laneToDelete = lanesRef.current.find((l) => l.id === laneId);
+        if (laneToDelete) {
+          setCards((prevCards) =>
+            prevCards.filter((card) => {
+              const cardLaneId = lanesRef.current.find(
+                (l) => l.name === card.column
+              )?.id;
+              return cardLaneId !== laneId && card.column !== laneId;
+            })
+          );
+        }
+
+        // Reload lanes in background to sync with backend
+        if (boardId) {
+          await loadLanes(boardId);
+        }
+
+        console.log(`Lane ${laneId} deleted and UI updated`);
+      };
     };
 
     // Register listeners
@@ -355,6 +473,9 @@ export const useBoardWebSocket = ({
     socketClient.on("assignee:added", handleAssigneeAdded);
     socketClient.on("assignee:removed", handleAssigneeRemoved);
     socketClient.on("presence:update", handlePresenceUpdate);
+    socketClient.on("lane:created", handleLaneCreated);
+    socketClient.on("lane:updated", handleLaneUpdated);
+    socketClient.on("lane:deleted", handleLaneDeleted);
 
     return () => {
       console.log("🔌 Unregistering WebSocket event listeners");
@@ -368,6 +489,9 @@ export const useBoardWebSocket = ({
       socketClient.off("assignee:added", handleAssigneeAdded);
       socketClient.off("assignee:removed", handleAssigneeRemoved);
       socketClient.off("presence:update", handlePresenceUpdate);
+      socketClient.off("lane:created", handleLaneCreated);
+      socketClient.off("lane:updated", handleLaneUpdated);
+      socketClient.off("lane:deleted", handleLaneDeleted);
     };
   }, [boardId, setCards, setActiveUsers, loadCards, getCurrentUser]);
 };
