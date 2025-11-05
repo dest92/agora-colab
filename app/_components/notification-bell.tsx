@@ -6,6 +6,7 @@ import {
   notificationsApi,
   socketClient,
   type Notification,
+  type DomainEventPayload,
 } from "@/app/_lib/api";
 
 export function NotificationBell() {
@@ -24,19 +25,20 @@ export function NotificationBell() {
     }, 30000);
 
     // Listen for real-time notifications
-    const handleNotificationCreated = (payload: Notification) => {
-      console.log("🔔 New notification received:", payload);
+    const handleNotificationCreated = (payload: DomainEventPayload) => {
+      const notification = payload as Notification;
+      console.log("🔔 New notification received:", notification);
 
       // Add to notifications list
-      setNotifications((prev) => [payload, ...prev]);
+      setNotifications((prev) => [notification, ...prev]);
 
       // Increment unread count
       setUnreadCount((prev) => prev + 1);
 
       // Show browser notification if supported
       if ("Notification" in window && Notification.permission === "granted") {
-        new Notification(payload.title, {
-          body: payload.body,
+        new Notification(notification.title, {
+          body: notification.body,
           icon: "/logo.png",
         });
       }
