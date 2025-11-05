@@ -7,7 +7,12 @@
 
 import { useEffect, useState } from "react";
 import { Users, Mail, Crown, Shield, User as UserIcon } from "lucide-react";
-import { workspacesApi, type WorkspaceMember, authApi, socketClient } from "@/app/_lib/api";
+import {
+  workspacesApi,
+  type WorkspaceMember,
+  authApi,
+  socketClient,
+} from "@/app/_lib/api";
 
 interface WorkspaceMembersProps {
   workspaceId: string;

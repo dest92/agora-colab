@@ -68,7 +68,7 @@ export default function DashboardPage() {
     if (selectedWorkspaceId && user?.id) {
       console.log(`🔌 Joining workspace room: ${selectedWorkspaceId}`);
       socketClient.join({ workspaceId: selectedWorkspaceId });
-      
+
       return () => {
         console.log(`🔌 Leaving workspace room: ${selectedWorkspaceId}`);
         socketClient.leave({ workspaceId: selectedWorkspaceId });
