@@ -60,8 +60,27 @@ export const useBoardWebSocket = ({
       userId: currentUserId || undefined,
     });
 
+    // Ensure we explicitly join the board/workspace room if the socket was
+    // already connected (connect() will emit join when already connected,
+    // but calling join here is idempotent and acts as a safe guarantee).
+    if (socketClient.isConnected()) {
+      try {
+        socketClient.join({ boardId, workspaceId });
+      } catch (e) {
+        console.warn("Failed to emit join from useBoardWebSocket:", e);
+      }
+    }
+
     return () => {
-      socketClient.disconnect();
+      // Leave the board room when unmounting or changing board
+      console.log(`🚪 Leaving board ${boardId} and workspace ${workspaceId}`);
+      try {
+        socketClient.leave({ boardId, workspaceId });
+      } catch (e) {
+        console.warn("Failed to emit leave from useBoardWebSocket:", e);
+      }
+      // Don't disconnect the socket - we might still be in the workspace
+      // socketClient.disconnect();
     };
   }, [boardId, workspaceId]);
 

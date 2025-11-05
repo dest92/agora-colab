@@ -161,7 +161,8 @@ export type WebSocketEvent =
   // Notifications
   | "notification:created"
   // Presence
-  | "presence:update";
+  | "presence:update"
+  | "workspace:presence:update";
 
 export interface DomainEventPayload {
   [key: string]: any;

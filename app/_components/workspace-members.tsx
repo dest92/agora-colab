@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from "react";
 import { Users, Mail, Crown, Shield, User as UserIcon } from "lucide-react";
-import { workspacesApi, type WorkspaceMember, authApi } from "@/app/_lib/api";
+import { workspacesApi, type WorkspaceMember, authApi, socketClient } from "@/app/_lib/api";
 
 interface WorkspaceMembersProps {
   workspaceId: string;
@@ -44,6 +44,7 @@ export function WorkspaceMembers({
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [isOwner, setIsOwner] = useState(false);
   const [updatingUserId, setUpdatingUserId] = useState<string | null>(null);
+  const [activeUserIds, setActiveUserIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const user = authApi.getCurrentUser();
@@ -57,6 +58,23 @@ export function WorkspaceMembers({
       loadMembers();
     }
   }, [workspaceId, currentUserId]);
+
+  // Listen for workspace presence updates
+  useEffect(() => {
+    if (!workspaceId) return;
+
+    const handlePresenceUpdate = (payload: any) => {
+      const data = payload as { users: string[] };
+      console.log("Workspace presence update received:", data);
+      setActiveUserIds(new Set(data.users));
+    };
+
+    socketClient.on("workspace:presence:update", handlePresenceUpdate);
+
+    return () => {
+      socketClient.off("workspace:presence:update", handlePresenceUpdate);
+    };
+  }, [workspaceId]);
 
   const loadMembers = async () => {
     try {
@@ -153,6 +171,7 @@ export function WorkspaceMembers({
                 ROLE_CONFIG.member;
               const RoleIcon = roleConfig.icon;
               const isCurrentUser = member.userId === currentUserId;
+              const isActive = activeUserIds.has(member.userId);
 
               return (
                 <div
@@ -161,15 +180,23 @@ export function WorkspaceMembers({
                 >
                   {/* Top row: Avatar + Name + Badges */}
                   <div className="flex items-start gap-3 mb-3">
-                    <div className="w-10 h-10 bg-[#00AFF0]/20 rounded-full flex items-center justify-center shrink-0">
+                    <div className="relative w-10 h-10 bg-[#00AFF0]/20 rounded-full flex items-center justify-center shrink-0">
                       <Users className="w-5 h-5 text-[#00AFF0]" />
+                      {isActive && (
+                        <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-[#2d2d2d] rounded-full" />
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <div className="text-white font-medium mb-2">
+                      <div className="text-white font-medium mb-2 flex items-center gap-2">
                         {member.name || member.email || member.userId}
                         {isCurrentUser && (
-                          <span className="ml-2 px-2 py-0.5 text-xs font-bold bg-[#00AFF0] text-black rounded">
+                          <span className="px-2 py-0.5 text-xs font-bold bg-[#00AFF0] text-black rounded">
                             YOU
+                          </span>
+                        )}
+                        {isActive && (
+                          <span className="px-2 py-0.5 text-xs font-bold bg-green-500 text-black rounded">
+                            ONLINE
                           </span>
                         )}
                       </div>

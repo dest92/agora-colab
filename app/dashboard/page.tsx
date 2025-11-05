@@ -6,6 +6,7 @@ import {
   authApi,
   workspacesApi,
   boardsApi,
+  socketClient,
   type Workspace,
   type Board,
 } from "@/app/_lib/api";
@@ -40,7 +41,40 @@ export default function DashboardPage() {
 
     setUser(currentUser);
     loadWorkspaces();
+
+    if (currentUser.id) {
+      socketClient.connect({ userId: currentUser.id });
+    }
+
+    const handleWorkspaceInvitation = (payload: any) => {
+      console.log("🤝 Workspace invitation received:", payload);
+
+      // Check if it's a workspace invitation notification
+      if (payload.type === "workspace_invitation") {
+        // Reload workspaces silently (without showing loading spinner)
+        loadWorkspacesQuietly();
+      }
+    };
+
+    socketClient.on("notification:created", handleWorkspaceInvitation);
+
+    return () => {
+      socketClient.off("notification:created", handleWorkspaceInvitation);
+    };
   }, [router]);
+
+  // Join workspace room when selectedWorkspaceId changes
+  useEffect(() => {
+    if (selectedWorkspaceId && user?.id) {
+      console.log(`🔌 Joining workspace room: ${selectedWorkspaceId}`);
+      socketClient.join({ workspaceId: selectedWorkspaceId });
+      
+      return () => {
+        console.log(`🔌 Leaving workspace room: ${selectedWorkspaceId}`);
+        socketClient.leave({ workspaceId: selectedWorkspaceId });
+      };
+    }
+  }, [selectedWorkspaceId, user?.id]);
 
   const loadWorkspaces = async () => {
     try {
@@ -85,6 +119,46 @@ export default function DashboardPage() {
       console.error("Failed to load workspaces:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // Load workspaces without showing loading spinner (for real-time updates)
+  const loadWorkspacesQuietly = async () => {
+    try {
+      // Load both owned workspaces and invited workspaces
+      const [ownedWorkspaces, invitedWorkspaces] = await Promise.all([
+        workspacesApi.listWorkspaces(),
+        workspacesApi.listInvites(),
+      ]);
+
+      // Transform invited workspaces to match Workspace interface
+      const invitedAsWorkspaces = invitedWorkspaces.map((invite) => ({
+        id: invite.workspaceId,
+        name: `${invite.workspaceName} (${invite.role})`,
+        ownerId: invite.ownerId,
+        createdAt: invite.joinedAt,
+      }));
+
+      // Combine and deduplicate by workspace ID
+      const workspaceMap = new Map<string, Workspace>();
+
+      // Add owned workspaces first (they take priority)
+      ownedWorkspaces.forEach((ws) => workspaceMap.set(ws.id, ws));
+
+      // Add invited workspaces only if not already in map
+      invitedAsWorkspaces.forEach((ws) => {
+        if (!workspaceMap.has(ws.id)) {
+          workspaceMap.set(ws.id, ws);
+        }
+      });
+
+      const allWorkspaces = Array.from(workspaceMap.values());
+      setWorkspaces(allWorkspaces);
+
+      // Don't auto-select or reload boards - keep current selection
+      console.log("✅ Workspaces updated silently in background");
+    } catch (error) {
+      console.error("Failed to reload workspaces:", error);
     }
   };
 

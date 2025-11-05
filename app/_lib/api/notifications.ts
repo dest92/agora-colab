@@ -14,6 +14,8 @@ export interface Notification {
   body: string;
   readAt: string | null;
   createdAt: string;
+  workspaceId?: string;
+  workspaceName?: string;
 }
 
 class NotificationsApi {
