@@ -6,6 +6,7 @@ import {
   notificationsApi,
   socketClient,
   type Notification,
+  type DomainEventPayload,
 } from "@/app/_lib/api";
 
 export function NotificationBell() {

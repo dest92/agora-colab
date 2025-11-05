@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { Input } from "@/components/ui/input"
+import { Input } from "@/app/_components/ui/input"
 import { ArrowRight } from "lucide-react"
 
 const EMOJIS = ["😊", "🚀", "💡", "🎯", "⭐", "🔥", "💪", "🎨", "🌟", "✨"]
