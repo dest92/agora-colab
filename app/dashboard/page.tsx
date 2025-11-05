@@ -10,7 +10,15 @@ import {
   type Workspace,
   type Board,
 } from "@/app/_lib/api";
-import { Users, Plus, Folder, Layout, LogOut, UserPlus } from "lucide-react";
+import {
+  Users,
+  Plus,
+  Folder,
+  Layout,
+  LogOut,
+  UserPlus,
+  Trash2,
+} from "lucide-react";
 import { InviteUserModal } from "@/app/_components/invite-user-modal-search";
 import { WorkspaceMembers } from "@/app/_components/workspace-members";
 import { NotificationBell } from "@/app/_components/notification-bell";
@@ -28,6 +36,10 @@ export default function DashboardPage() {
   const [boardTitle, setBoardTitle] = useState("");
   const [inviteModalOpen, setInviteModalOpen] = useState(false);
   const [membersKey, setMembersKey] = useState(0);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [workspaceToDelete, setWorkspaceToDelete] = useState<string | null>(
+    null
+  );
 
   useEffect(() => {
     // Check authentication
@@ -227,6 +239,34 @@ export default function DashboardPage() {
     router.push("/login");
   };
 
+  const handleDeleteWorkspace = (workspaceId: string) => {
+    setWorkspaceToDelete(workspaceId);
+    setDeleteModalOpen(true);
+  };
+
+  const confirmDeleteWorkspace = async () => {
+    if (!workspaceToDelete) return;
+
+    try {
+      await workspacesApi.deleteWorkspace(workspaceToDelete);
+
+      // Remove workspace from list
+      setWorkspaces(workspaces.filter((w) => w.id !== workspaceToDelete));
+
+      // If the deleted workspace was selected, clear selection
+      if (selectedWorkspaceId === workspaceToDelete) {
+        setSelectedWorkspaceId("");
+        setBoards([]);
+      }
+
+      setDeleteModalOpen(false);
+      setWorkspaceToDelete(null);
+    } catch (error) {
+      console.error("Failed to delete workspace:", error);
+      alert("Failed to delete workspace. You must be the owner to delete it.");
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#1e1e1e]">
@@ -341,22 +381,38 @@ export default function DashboardPage() {
                     </div>
                   ) : (
                     workspaces.map((workspace) => (
-                      <button
+                      <div
                         key={workspace.id}
-                        onClick={() => handleSelectWorkspace(workspace.id)}
-                        className={`w-full px-3 sm:px-4 py-2.5 sm:py-3 text-left transition-colors ${
+                        className={`flex items-center gap-2 transition-colors ${
                           selectedWorkspaceId === workspace.id
-                            ? "bg-[#00AFF0] text-white"
-                            : "bg-[#2d2d2d] hover:bg-[#3d3d3d] text-white"
+                            ? "bg-[#00AFF0]"
+                            : "bg-[#2d2d2d] hover:bg-[#3d3d3d]"
                         }`}
                       >
-                        <div className="font-semibold text-sm sm:text-base">
-                          {workspace.name}
-                        </div>
-                        <div className="text-xs opacity-60 mt-1">
-                          {new Date(workspace.createdAt).toLocaleDateString()}
-                        </div>
-                      </button>
+                        <button
+                          onClick={() => handleSelectWorkspace(workspace.id)}
+                          className="flex-1 px-3 sm:px-4 py-2.5 sm:py-3 text-left text-white"
+                        >
+                          <div className="font-semibold text-sm sm:text-base">
+                            {workspace.name}
+                          </div>
+                          <div className="text-xs opacity-60 mt-1">
+                            {new Date(workspace.createdAt).toLocaleDateString()}
+                          </div>
+                        </button>
+                        {user?.id === workspace.ownerId && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteWorkspace(workspace.id);
+                            }}
+                            className="px-2 sm:px-3 py-2.5 sm:py-3 hover:bg-[#e81123] transition-colors"
+                            title="Delete workspace"
+                          >
+                            <Trash2 className="w-4 h-4 text-white" />
+                          </button>
+                        )}
+                      </div>
                     ))
                   )}
                 </div>
@@ -473,6 +529,50 @@ export default function DashboardPage() {
             setMembersKey((prev) => prev + 1);
           }}
         />
+      )}
+
+      {/* Delete Workspace Modal */}
+      {deleteModalOpen && workspaceToDelete && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1a1a] border-2 border-[#e81123] max-w-md w-full">
+            <div className="px-6 py-4 bg-[#e81123] border-b-2 border-[#e81123]">
+              <h2 className="text-xl font-semibold text-white flex items-center gap-2">
+                <Trash2 className="w-5 h-5" />
+                Delete Workspace
+              </h2>
+            </div>
+
+            <div className="p-6">
+              <p className="text-white mb-4">
+                Are you sure you want to delete this workspace?
+              </p>
+              <p className="text-white/60 text-sm mb-6">
+                <strong className="text-[#e81123]">Warning:</strong> This action
+                cannot be undone. All boards, cards, and data in this workspace
+                will be permanently deleted.
+              </p>
+
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => {
+                    setDeleteModalOpen(false);
+                    setWorkspaceToDelete(null);
+                  }}
+                  className="px-4 py-2 bg-[#2d2d2d] hover:bg-[#3d3d3d] text-white font-semibold transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmDeleteWorkspace}
+                  className="px-4 py-2 bg-[#e81123] hover:bg-[#c70f1f] text-white font-semibold transition-colors flex items-center gap-2"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Delete Workspace
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
