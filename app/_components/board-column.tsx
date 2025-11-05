@@ -5,7 +5,7 @@ import type React from "react";
 import { useState } from "react";
 import { BoardCard } from "./board-card";
 import { Textarea } from "./ui/textarea";
-import { Plus, X } from "lucide-react";
+import { Plus, X, Trash2 } from "lucide-react";
 
 interface User {
   name: string;
@@ -61,6 +61,7 @@ interface BoardColumnProps {
   onRemoveTag: (cardId: string, tag: string) => void;
   currentUser: User;
   activeUsers: User[];
+  onDeleteLane?: (laneId: string) => void;
 }
 
 const COLOR_MAP: Record<string, string> = {
@@ -85,6 +86,7 @@ export function BoardColumn({
   onRemoveTag,
   currentUser,
   activeUsers,
+  onDeleteLane,
 }: BoardColumnProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newCardContent, setNewCardContent] = useState("");
@@ -150,8 +152,19 @@ export function BoardColumn({
           <h2 className="text-2xl font-semibold text-white tracking-tight lowercase">
             {column.title}
           </h2>
-          <div className="px-3 py-1 bg-black/30 text-white font-bold text-lg min-w-[40px] text-center">
-            {cards.length}
+          <div className="flex items-center gap-2">
+            <div className="px-3 py-1 bg-black/30 text-white font-bold text-lg min-w-10 text-center">
+              {cards.length}
+            </div>
+            {onDeleteLane && (
+              <button
+                onClick={() => onDeleteLane(column.id)}
+                className="p-2 bg-black/30 hover:bg-[#e81123] text-white transition-colors"
+                title="Delete column (including all cards)"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </div>
