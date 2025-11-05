@@ -119,6 +119,14 @@ class WorkspacesApi {
       { role }
     );
   }
+
+  /**
+   * Delete a workspace (only owners can delete)
+   * DELETE /workspaces/:workspaceId
+   */
+  async deleteWorkspace(workspaceId: string): Promise<{ deleted: boolean }> {
+    return apiClient.delete<{ deleted: boolean }>(`/workspaces/${workspaceId}`);
+  }
 }
 
 export const workspacesApi = new WorkspacesApi();

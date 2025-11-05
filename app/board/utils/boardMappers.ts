@@ -39,16 +39,32 @@ export const mapLaneToColumn = (
 
 /**
  * Map column name to lane ID
+ * Now supports both lane ID (UUID) and lane name
  */
 export const mapColumnToLaneId = (
-  columnName: string,
+  columnNameOrId: string,
   lanes: { id: string; name: string }[]
 ): string | undefined => {
-  const lane = lanes.find((l) => l.name === columnName);
+  // First, try to find by ID (UUID format)
+  let lane = lanes.find((l) => l.id === columnNameOrId);
+
+  // If not found by ID, try to find by name (case-insensitive)
+  if (!lane) {
+    lane = lanes.find(
+      (l) => l.name.toLowerCase() === columnNameOrId.toLowerCase()
+    );
+  }
+
   console.log("🗺️ mapColumnToLaneId:", {
-    columnName,
+    input: columnNameOrId,
     laneId: lane?.id,
+    foundByIdOrName: lane
+      ? lane.id === columnNameOrId
+        ? "ID"
+        : "name"
+      : "not found",
     allLanes: lanes,
   });
+
   return lane?.id;
 };

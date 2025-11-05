@@ -12,6 +12,11 @@ type EventHandler = (payload: DomainEventPayload) => void;
 class SocketClient {
   private socket: Socket | null = null;
   private url: string;
+  private lastJoinOptions?: {
+    boardId?: string;
+    workspaceId?: string;
+    sessionId?: string;
+  };
   private handlers: Map<WebSocketEvent, Set<EventHandler>> = new Map();
 
   constructor() {
@@ -28,8 +33,34 @@ class SocketClient {
     sessionId?: string;
     userId?: string;
   }): Socket {
+    // Remember last join options so we can re-join rooms after reconnects
+    if (options) {
+      this.lastJoinOptions = {
+        boardId: options.boardId,
+        workspaceId: options.workspaceId,
+        sessionId: options.sessionId,
+      };
+    }
+
     if (this.socket?.connected) {
       console.warn("Socket already connected");
+      // If the socket is already connected, emit a join for the new context
+      if (options) {
+        try {
+          console.log("🔌 Emitting join for already-connected socket:", {
+            boardId: options.boardId,
+            workspaceId: options.workspaceId,
+            sessionId: options.sessionId,
+          });
+          this.socket.emit("join", {
+            boardId: options.boardId,
+            workspaceId: options.workspaceId,
+            sessionId: options.sessionId,
+          });
+        } catch (e) {
+          console.warn("Failed to emit join on existing socket:", e);
+        }
+      }
       return this.socket;
     }
 
@@ -61,6 +92,14 @@ class SocketClient {
     // Re-attach event handlers after reconnection
     this.socket.on("connect", () => {
       this.reattachHandlers();
+      // Re-join last rooms (if any)
+      if (this.lastJoinOptions) {
+        try {
+          this.socket!.emit("join", this.lastJoinOptions);
+        } catch (e) {
+          console.warn("Failed to re-emit join after reconnect:", e);
+        }
+      }
     });
 
     return this.socket;
@@ -120,6 +159,7 @@ class SocketClient {
       console.warn("Cannot join room: socket not connected");
       return;
     }
+    console.log("🔌 Manually joining room:", context);
     this.socket.emit("join", context);
   }
 
