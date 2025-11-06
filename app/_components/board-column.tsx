@@ -6,6 +6,7 @@ import { useState } from "react";
 import { BoardCard } from "./board-card";
 import { Textarea } from "./ui/textarea";
 import { Plus, X, Trash2, GripVertical } from "lucide-react";
+import type { Tag } from "@/app/_lib/api/types";
 
 interface User {
   name: string;
