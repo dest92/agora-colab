@@ -103,6 +103,7 @@ export default function BoardPage() {
     loadLanes,
     loadCards,
     getCurrentUser,
+    movingCardsRef: boardActions.movingCardsRef,
   });
 
   // Chat hook

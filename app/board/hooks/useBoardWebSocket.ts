@@ -23,6 +23,7 @@ interface UseBoardWebSocketParams {
     showLoading?: boolean
   ) => Promise<void>;
   getCurrentUser: () => User;
+  movingCardsRef?: React.MutableRefObject<Set<string>>;
 }
 
 export const useBoardWebSocket = ({
@@ -35,6 +36,7 @@ export const useBoardWebSocket = ({
   loadLanes,
   loadCards,
   getCurrentUser,
+  movingCardsRef,
 }: UseBoardWebSocketParams) => {
   // Use refs to avoid re-registering listeners when cards/lanes change
   const cardsRef = useRef(cards);
@@ -132,6 +134,14 @@ export const useBoardWebSocket = ({
       console.log("Card moved event:", payload);
 
       const { cardId, targetLaneId, userId } = payload;
+
+      // Check if this card is being moved locally
+      if (movingCardsRef?.current.has(cardId)) {
+        console.log(
+          "Card is being moved locally, ignoring remote event to preserve optimistic update"
+        );
+        return;
+      }
 
       const currentUserId = authApi.getCurrentUser()?.id;
       if (userId === currentUserId) {
