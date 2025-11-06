@@ -798,6 +798,9 @@ export default function BoardPage() {
                   onAddTag={boardActions.handleAddTag}
                   onRemoveTag={boardActions.handleRemoveTag}
                   onDeleteLane={handleDeleteLane}
+                  onLaneDragStart={handleLaneDragStart}
+                  onLaneDragEnd={handleLaneDragEnd}
+                  isDragging={isDragging}
                   currentUser={user}
                   activeUsers={activeUsers}
                 />

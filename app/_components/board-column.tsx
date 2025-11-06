@@ -5,7 +5,7 @@ import type React from "react";
 import { useState } from "react";
 import { BoardCard } from "./board-card";
 import { Textarea } from "./ui/textarea";
-import { Plus, X, Trash2 } from "lucide-react";
+import { Plus, X, Trash2, GripVertical } from "lucide-react";
 
 interface User {
   name: string;
@@ -62,6 +62,9 @@ interface BoardColumnProps {
   currentUser: User;
   activeUsers: User[];
   onDeleteLane?: (laneId: string) => void;
+  onLaneDragStart?: (laneId: string) => void;
+  onLaneDragEnd?: () => void;
+  isDragging?: boolean;
 }
 
 const COLOR_MAP: Record<string, string> = {
@@ -87,6 +90,9 @@ export function BoardColumn({
   currentUser,
   activeUsers,
   onDeleteLane,
+  onLaneDragStart,
+  onLaneDragEnd,
+  isDragging = false,
 }: BoardColumnProps) {
   const [isAdding, setIsAdding] = useState(false);
   const [newCardContent, setNewCardContent] = useState("");
@@ -145,13 +151,28 @@ export function BoardColumn({
       onDrop={handleDrop}
     >
       <div
-        className="p-5 mb-4"
+        className="p-5 mb-4 relative"
         style={{ backgroundColor: COLOR_MAP[column.color] }}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-2xl font-semibold text-white tracking-tight lowercase">
-            {column.title}
-          </h2>
+          <div className="flex items-center gap-2">
+            {onLaneDragStart && (
+              <div
+                draggable
+                onDragStart={() => onLaneDragStart(column.id)}
+                onDragEnd={() => onLaneDragEnd?.()}
+                className={`cursor-grab hover:cursor-grabbing p-1 bg-black/20 hover:bg-black/30 transition-colors rounded ${
+                  isDragging ? "opacity-50 cursor-grabbing" : ""
+                }`}
+                title="Drag to reorder column"
+              >
+                <GripVertical className="w-5 h-5 text-white" />
+              </div>
+            )}
+            <h2 className="text-2xl font-semibold text-white tracking-tight lowercase">
+              {column.title}
+            </h2>
+          </div>
           <div className="flex items-center gap-2">
             <div className="px-3 py-1 bg-black/30 text-white font-bold text-lg min-w-10 text-center">
               {cards.length}
