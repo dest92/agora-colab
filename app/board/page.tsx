@@ -30,6 +30,8 @@ import { useBoardWebSocket } from "./hooks/useBoardWebSocket";
 import { InviteUserModal } from "@/app/_components/invite-user-modal-search";
 import { ActiveUsersDropdown } from "@/app/_components/active-users-dropdown";
 import { NotificationBell } from "@/app/_components/notification-bell";
+import { BoardChat } from "@/app/_components/board-chat";
+import { useBoardChat } from "./hooks/useBoardChat";
 
 const getCurrentUser = (): User => {
   const user = authApi.getCurrentUser();
@@ -101,6 +103,11 @@ export default function BoardPage() {
     loadLanes,
     loadCards,
     getCurrentUser,
+  });
+
+  // Chat hook
+  const { messages: chatMessages, setMessages: setChatMessages } = useBoardChat({
+    boardId,
   });
 
   // Initialize board
@@ -930,6 +937,19 @@ export default function BoardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Board Chat */}
+      {boardId && (
+        <BoardChat
+          boardId={boardId}
+          onNewMessage={(message) => {
+            setChatMessages((prev) => [...prev, message]);
+          }}
+          onDeleteMessage={(messageId) => {
+            setChatMessages((prev) => prev.filter((m) => m.id !== messageId));
+          }}
+        />
       )}
     </div>
   );

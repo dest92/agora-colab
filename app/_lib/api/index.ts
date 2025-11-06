@@ -32,6 +32,8 @@ export { notificationsApi } from "./notifications";
 export type { Notification } from "./notifications";
 export { votesApi } from "./votes";
 export type { VoteSummary, VoteResponse, Voter, UserVote } from "./votes";
+export { chatApi } from "./chat";
+export type { ChatMessage, CreateChatMessageDto } from "./chat";
 
 // Socket.IO Client
 export { socketClient, useSocket } from "./socket";
