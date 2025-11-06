@@ -22,6 +22,7 @@ import {
   socketClient,
   commentsApi,
   type Card as ApiCard,
+  type Tag,
 } from "@/app/_lib/api";
 import { usersApi } from "@/app/_lib/api/users";
 
@@ -53,7 +54,7 @@ interface Card {
   comments: Comment[];
   assignedTo?: User;
   timestamp: number;
-  tags: string[];
+  tags: Tag[];
 }
 
 const getCurrentUser = (): User => {
@@ -620,21 +621,29 @@ export default function BoardPage() {
     );
   };
 
-  const handleAddTag = (cardId: string, tag: string) => {
+  const handleAddTag = (cardId: string, label: string, color?: string) => {
     setCards(
       cards.map((card) => {
         if (card.id !== cardId) return card;
-        if (card.tags.includes(tag)) return card;
-        return { ...card, tags: [...card.tags, tag] };
+        // Check if tag with this label already exists
+        if (card.tags.some((t) => t.label === label)) return card;
+        // Create a new Tag object
+        const newTag: Tag = {
+          id: `tag-${Date.now()}-${Math.random()}`,
+          boardId: boardId,
+          label,
+          color: color || null,
+        };
+        return { ...card, tags: [...card.tags, newTag] };
       })
     );
   };
 
-  const handleRemoveTag = (cardId: string, tag: string) => {
+  const handleRemoveTag = (cardId: string, tagId: string) => {
     setCards(
       cards.map((card) => {
         if (card.id !== cardId) return card;
-        return { ...card, tags: card.tags.filter((t) => t !== tag) };
+        return { ...card, tags: card.tags.filter((t) => t.id !== tagId) };
       })
     );
   };
@@ -680,7 +689,7 @@ export default function BoardPage() {
       card.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
       card.author.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       card.tags.some((tag) =>
-        tag.toLowerCase().includes(searchQuery.toLowerCase())
+        tag.label.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
     const matchesPriority =
