@@ -30,6 +30,14 @@ class TagsApi {
   }
 
   /**
+   * Get tags assigned to a specific card
+   * GET /boards/:boardId/cards/:cardId/tags
+   */
+  async getCardTags(boardId: string, cardId: string): Promise<Tag[]> {
+    return apiClient.get<Tag[]>(`/boards/${boardId}/cards/${cardId}/tags`);
+  }
+
+  /**
    * Assign tag to card
    * POST /boards/:boardId/cards/:cardId/tags/:tagId
    */

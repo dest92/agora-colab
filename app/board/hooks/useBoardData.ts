@@ -250,9 +250,8 @@ export const useBoardData = () => {
             let cardTags: Tag[] = [];
             try {
               console.log(`🔄 Loading tags for card ${apiCard.id}...`);
-              // TODO: Need to implement getCardTags endpoint in backend
-              // For now, we'll keep it empty and rely on WebSocket updates
-              console.log(`ℹ️ Tags will be loaded via WebSocket events`);
+              cardTags = await tagsApi.getCardTags(boardId, apiCard.id);
+              console.log(`✅ Loaded ${cardTags.length} tags for card ${apiCard.id}:`, cardTags);
             } catch (error) {
               console.error(
                 `❌ Failed to load tags for card ${apiCard.id}:`,
