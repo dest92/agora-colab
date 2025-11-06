@@ -7,13 +7,14 @@ import {
   Trash2,
   ChevronDown,
   ChevronUp,
-  Tag,
+  Tag as TagIcon,
   ThumbsUp,
   ThumbsDown,
   MessageSquare,
 } from "lucide-react";
 import { Textarea } from "./ui/textarea";
 import { Input } from "./ui/input";
+import type { Tag } from "@/app/_lib/api";
 
 interface Comment {
   id: string;
@@ -33,7 +34,7 @@ interface Card {
   comments: Comment[];
   assignedTo?: any;
   timestamp: number;
-  tags: string[];
+  tags: Tag[];
 }
 
 interface BoardCardProps {
@@ -46,8 +47,8 @@ interface BoardCardProps {
     priority: "low" | "normal" | "high" | "urgent"
   ) => void;
   onAssignUser: (cardId: string, user: any | undefined) => void;
-  onAddTag: (cardId: string, tag: string) => void;
-  onRemoveTag: (cardId: string, tag: string) => void;
+  onAddTag: (cardId: string, label: string, color?: string) => void;
+  onRemoveTag: (cardId: string, tagId: string) => void;
   currentUser: any;
   activeUsers: any[];
 }
@@ -153,11 +154,12 @@ export function BoardCard({
           <div className="flex flex-wrap gap-2 mb-3">
             {card.tags.map((tag) => (
               <button
-                key={tag}
-                onClick={() => onRemoveTag(card.id, tag)}
-                className="px-2 py-1 bg-[#A200FF] text-white text-xs font-semibold uppercase tracking-wider hover:bg-[#8200DF] transition-colors"
+                key={tag.id}
+                onClick={() => onRemoveTag(card.id, tag.id)}
+                className="px-2 py-1 text-white text-xs font-semibold uppercase tracking-wider hover:opacity-80 transition-opacity"
+                style={{ backgroundColor: tag.color || "#A200FF" }}
               >
-                {tag} ×
+                {tag.label} ×
               </button>
             ))}
           </div>
@@ -353,7 +355,7 @@ export function BoardCard({
                     onClick={handleAddTag}
                     className="h-9 px-4 bg-[#A200FF] hover:bg-[#8200DF] text-white font-semibold"
                   >
-                    <Tag className="w-4 h-4" />
+                    <TagIcon className="w-4 h-4" />
                   </button>
                 </div>
               )}

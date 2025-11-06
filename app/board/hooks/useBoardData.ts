@@ -10,6 +10,8 @@ import {
   authApi,
   votesApi,
   assigneesApi,
+  tagsApi,
+  type Tag,
 } from "@/app/_lib/api";
 import { getUserInfo } from "../utils/userCache";
 import { mapLaneToColumn } from "../utils/boardMappers";
@@ -39,13 +41,26 @@ export interface Card {
   comments: Comment[];
   assignedTo?: User;
   timestamp: number;
-  tags: string[];
+  tags: Tag[];
 }
 
 export const useBoardData = () => {
   const [cards, setCards] = useState<Card[]>([]);
   const [lanes, setLanes] = useState<{ id: string; name: string }[]>([]);
+  const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const loadTags = useCallback(async (boardId: string) => {
+    try {
+      const tags = await tagsApi.listTags(boardId);
+      setAvailableTags(tags);
+      console.log("✅ Tags loaded:", tags);
+      return tags;
+    } catch (error) {
+      console.error("Failed to load tags:", error);
+      return [];
+    }
+  }, []);
 
   const loadLanes = useCallback(async (boardId: string) => {
     try {
@@ -231,6 +246,20 @@ export const useBoardData = () => {
               );
             }
 
+            // Load tags for this card
+            let cardTags: Tag[] = [];
+            try {
+              console.log(`🔄 Loading tags for card ${apiCard.id}...`);
+              // TODO: Need to implement getCardTags endpoint in backend
+              // For now, we'll keep it empty and rely on WebSocket updates
+              console.log(`ℹ️ Tags will be loaded via WebSocket events`);
+            } catch (error) {
+              console.error(
+                `❌ Failed to load tags for card ${apiCard.id}:`,
+                error
+              );
+            }
+
             return {
               id: apiCard.id,
               content: apiCard.content,
@@ -247,7 +276,7 @@ export const useBoardData = () => {
               comments,
               assignedTo,
               timestamp: new Date(apiCard.createdAt).getTime(),
-              tags: [],
+              tags: cardTags,
             };
           })
         );
@@ -270,9 +299,12 @@ export const useBoardData = () => {
     setCards,
     lanes,
     setLanes,
+    availableTags,
+    setAvailableTags,
     loading,
     setLoading,
     loadLanes,
     loadCards,
+    loadTags,
   };
 };
