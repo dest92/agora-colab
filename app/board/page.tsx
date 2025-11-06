@@ -770,15 +770,10 @@ export default function BoardPage() {
             return (
               <div
                 key={lane.id}
-                draggable
-                onDragStart={() => handleLaneDragStart(lane.id)}
                 onDragOver={(e) => handleLaneDragOver(e, lane.id)}
                 onDragLeave={handleLaneDragLeave}
                 onDrop={(e) => handleLaneDrop(e, lane.id)}
-                onDragEnd={handleLaneDragEnd}
                 className={`transition-all ${
-                  isDragging ? "opacity-50 cursor-grabbing" : "cursor-grab"
-                } ${
                   isDragOver
                     ? "scale-105 ring-2 ring-[#00AFF0] ring-offset-2 ring-offset-[#1e1e1e]"
                     : ""
