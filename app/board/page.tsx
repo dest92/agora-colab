@@ -79,7 +79,7 @@ export default function BoardPage() {
   } | null>(null);
 
   // Custom hooks for data management
-  const { cards, setCards, lanes, loading, loadLanes, loadCards } =
+  const { cards, setCards, lanes, setLanes, loading, loadLanes, loadCards } =
     useBoardData();
 
   const boardActions = useBoardActions({
@@ -191,16 +191,43 @@ export default function BoardPage() {
   const handleCreateLane = async () => {
     if (!newLaneName.trim() || !boardId) return;
 
+    const laneName = newLaneName.trim();
+
+    // Close modal and clear input immediately
+    setNewLaneName("");
+    setShowAddLaneModal(false);
+
+    // Generate a temporary ID for optimistic update
+    const tempId = `temp-lane-${Date.now()}`;
+
+    // Optimistic update: Add lane immediately to UI
+    const optimisticLane = {
+      id: tempId,
+      name: laneName,
+    };
+
+    setLanes((prevLanes) => [...prevLanes, optimisticLane]);
+
     try {
       setIsCreatingLane(true);
-      await boardsApi.createLane(boardId, newLaneName.trim());
-      setNewLaneName("");
-      setShowAddLaneModal(false);
-      // Reload lanes
-      await loadLanes(boardId);
+
+      // Call API to create lane
+      const newLane = await boardsApi.createLane(boardId, laneName);
+
+      // Replace temp lane with real lane from backend
+      setLanes((prevLanes) =>
+        prevLanes.map((lane) =>
+          lane.id === tempId ? { id: newLane.id, name: newLane.name } : lane
+        )
+      );
+
+      console.log("✅ Lane created:", newLane);
     } catch (error) {
       console.error("Failed to create lane:", error);
       alert("Failed to create column. Please try again.");
+
+      // Remove the optimistic lane on error
+      setLanes((prevLanes) => prevLanes.filter((lane) => lane.id !== tempId));
     } finally {
       setIsCreatingLane(false);
     }
