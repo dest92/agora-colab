@@ -30,6 +30,8 @@ import { useBoardWebSocket } from "./hooks/useBoardWebSocket";
 import { InviteUserModal } from "@/app/_components/invite-user-modal-search";
 import { ActiveUsersDropdown } from "@/app/_components/active-users-dropdown";
 import { NotificationBell } from "@/app/_components/notification-bell";
+import { BoardChat } from "@/app/_components/board-chat";
+import { useBoardChat } from "./hooks/useBoardChat";
 
 const getCurrentUser = (): User => {
   const user = authApi.getCurrentUser();
@@ -105,6 +107,12 @@ export default function BoardPage() {
     loadLanes,
     loadCards,
     getCurrentUser,
+    movingCardsRef: boardActions.movingCardsRef,
+  });
+
+  // Chat hook
+  const { messages: chatMessages, setMessages: setChatMessages } = useBoardChat({
+    boardId,
   });
 
   // Initialize board
@@ -767,15 +775,10 @@ export default function BoardPage() {
             return (
               <div
                 key={lane.id}
-                draggable
-                onDragStart={() => handleLaneDragStart(lane.id)}
                 onDragOver={(e) => handleLaneDragOver(e, lane.id)}
                 onDragLeave={handleLaneDragLeave}
                 onDrop={(e) => handleLaneDrop(e, lane.id)}
-                onDragEnd={handleLaneDragEnd}
                 className={`transition-all ${
-                  isDragging ? "opacity-50 cursor-grabbing" : "cursor-grab"
-                } ${
                   isDragOver
                     ? "scale-105 ring-2 ring-[#00AFF0] ring-offset-2 ring-offset-[#1e1e1e]"
                     : ""
@@ -800,6 +803,9 @@ export default function BoardPage() {
                   onAddTag={boardActions.handleAddTag}
                   onRemoveTag={boardActions.handleRemoveTag}
                   onDeleteLane={handleDeleteLane}
+                  onLaneDragStart={handleLaneDragStart}
+                  onLaneDragEnd={handleLaneDragEnd}
+                  isDragging={isDragging}
                   currentUser={user}
                   activeUsers={activeUsers}
                 />
@@ -935,6 +941,19 @@ export default function BoardPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Board Chat */}
+      {boardId && (
+        <BoardChat
+          boardId={boardId}
+          onNewMessage={(message) => {
+            setChatMessages((prev) => [...prev, message]);
+          }}
+          onDeleteMessage={(messageId) => {
+            setChatMessages((prev) => prev.filter((m) => m.id !== messageId));
+          }}
+        />
       )}
     </div>
   );

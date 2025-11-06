@@ -166,7 +166,10 @@ export type WebSocketEvent =
   // Lanes
   | "lane:created"
   | "lane:updated"
-  | "lane:deleted";
+  | "lane:deleted"
+  // Chat
+  | "chat:message:sent"
+  | "chat:message:deleted";
 
 export interface DomainEventPayload {
   [key: string]: any;

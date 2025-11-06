@@ -3,7 +3,8 @@
  * Handles all board actions (create, update, delete cards, comments, etc.)
  */
 
-import { boardsApi, commentsApi, votesApi, assigneesApi, tagsApi, type Tag } from "@/app/_lib/api";
+import { useState, useRef } from "react";
+import { boardsApi, commentsApi, votesApi, assigneesApi } from "@/app/_lib/api";
 import { mapColumnToLaneId } from "../utils/boardMappers";
 import type { Card, Comment, User } from "./useBoardData";
 
@@ -26,6 +27,8 @@ export const useBoardActions = ({
   availableTags = [],
   setAvailableTags,
 }: UseBoardActionsParams) => {
+  // Track cards being moved to prevent state overwrites
+  const movingCardsRef = useRef<Set<string>>(new Set());
   const handleAddCard = async (
     columnId: string,
     content: string,
@@ -118,9 +121,23 @@ export const useBoardActions = ({
       lanesAvailable: lanes.length,
     });
 
-    // Update local state optimistically
+    // Mark card as being moved
+    movingCardsRef.current.add(cardId);
+
+    // Convert lane ID to lane name for UI state
+    // newColumn comes as UUID from BoardColumn component
+    const targetLane = lanes.find((l) => l.id === newColumn);
+    const columnName = targetLane ? targetLane.name : newColumn;
+
+    console.log("🎯 Target column:", {
+      receivedId: newColumn,
+      laneName: columnName,
+      targetLane,
+    });
+
+    // Update local state optimistically with lane name
     const updatedCards = cards.map((card) =>
-      card.id === cardId ? { ...card, column: newColumn } : card
+      card.id === cardId ? { ...card, column: columnName } : card
     );
     setCards(updatedCards);
 
@@ -132,6 +149,7 @@ export const useBoardActions = ({
       if (!laneId) {
         console.error("❌ Cannot find lane ID for column:", newColumn);
         setCards(cards); // Revert
+        movingCardsRef.current.delete(cardId);
         return;
       }
 
@@ -139,10 +157,16 @@ export const useBoardActions = ({
         laneId: laneId,
       });
 
-      console.log(`✅ Card ${cardId} moved to ${newColumn} (lane: ${laneId})`);
+      console.log(`✅ Card ${cardId} moved to ${columnName} (lane: ${laneId})`);
+      
+      // Keep the card marked as moving for a bit to prevent overwrites from events
+      setTimeout(() => {
+        movingCardsRef.current.delete(cardId);
+      }, 2000);
     } catch (error) {
       console.error("❌ Failed to move card:", error);
       setCards(cards); // Revert optimistic update on error
+      movingCardsRef.current.delete(cardId);
     }
   };
 
@@ -362,5 +386,6 @@ export const useBoardActions = ({
     handleAssignUser,
     handleAddTag,
     handleRemoveTag,
+    movingCardsRef,
   };
 };
