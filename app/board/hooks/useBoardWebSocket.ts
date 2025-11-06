@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef } from "react";
-import { socketClient, authApi } from "@/app/_lib/api";
+import { socketClient, authApi, type Tag } from "@/app/_lib/api";
 import { getUserInfo } from "../utils/userCache";
 import { mapLaneToColumn } from "../utils/boardMappers";
 import type { Card, Comment, User } from "./useBoardData";
@@ -16,6 +16,8 @@ interface UseBoardWebSocketParams {
   cards: Card[];
   setCards: React.Dispatch<React.SetStateAction<Card[]>>;
   setActiveUsers: React.Dispatch<React.SetStateAction<User[]>>;
+  availableTags?: Tag[];
+  setAvailableTags?: React.Dispatch<React.SetStateAction<Tag[]>>;
   loadLanes: (boardId: string) => Promise<{ id: string; name: string }[]>;
   loadCards: (
     boardId: string,
@@ -33,6 +35,8 @@ export const useBoardWebSocket = ({
   cards,
   setCards,
   setActiveUsers,
+  availableTags = [],
+  setAvailableTags,
   loadLanes,
   loadCards,
   getCurrentUser,
@@ -41,6 +45,7 @@ export const useBoardWebSocket = ({
   // Use refs to avoid re-registering listeners when cards/lanes change
   const cardsRef = useRef(cards);
   const lanesRef = useRef(lanes);
+  const availableTagsRef = useRef(availableTags);
 
   // Update refs when values change
   useEffect(() => {
@@ -50,6 +55,10 @@ export const useBoardWebSocket = ({
   useEffect(() => {
     lanesRef.current = lanes;
   }, [lanes]);
+
+  useEffect(() => {
+    availableTagsRef.current = availableTags;
+  }, [availableTags]);
 
   // Connect WebSocket
   useEffect(() => {
@@ -484,6 +493,65 @@ export const useBoardWebSocket = ({
       };
     };
 
+    // Tag event handlers
+    const handleTagCreated = async (payload: any) => {
+      console.log("🏷️ Tag created event:", payload);
+      const { tagId, boardId: eventBoardId, label, color } = payload;
+
+      if (eventBoardId !== boardId) return;
+
+      const newTag: Tag = {
+        id: tagId,
+        boardId: eventBoardId,
+        label,
+        color: color || null,
+      };
+
+      // Add to available tags if not already there
+      if (setAvailableTags && !availableTagsRef.current.find(t => t.id === tagId)) {
+        setAvailableTags([...availableTagsRef.current, newTag]);
+      }
+    };
+
+    const handleTagAssigned = async (payload: any) => {
+      console.log("🏷️ Tag assigned event:", payload);
+      const { tagId, cardId, boardId: eventBoardId } = payload;
+
+      if (eventBoardId !== boardId) return;
+
+      // Find the tag from available tags
+      const tag = availableTagsRef.current.find(t => t.id === tagId);
+      if (!tag) {
+        console.warn("Tag not found in available tags:", tagId);
+        return;
+      }
+
+      // Add tag to card
+      setCards((prevCards) =>
+        prevCards.map((card) => {
+          if (card.id !== cardId) return card;
+          // Check if tag already exists
+          if (card.tags.some(t => t.id === tagId)) return card;
+          return { ...card, tags: [...card.tags, tag] };
+        })
+      );
+    };
+
+    const handleTagUnassigned = async (payload: any) => {
+      console.log("🏷️ Tag unassigned event:", payload);
+      const { tagId, cardId, boardId: eventBoardId } = payload;
+
+      if (eventBoardId !== boardId) return;
+
+      // Remove tag from card
+      setCards((prevCards) =>
+        prevCards.map((card) => {
+          if (card.id !== cardId) return card;
+          return { ...card, tags: card.tags.filter((t) => t.id !== tagId) };
+        })
+      );
+    };
+
     // Register listeners
     socketClient.on("card:created", handleCardCreated);
     socketClient.on("card:updated", handleCardUpdated);
@@ -498,6 +566,9 @@ export const useBoardWebSocket = ({
     socketClient.on("lane:created", handleLaneCreated);
     socketClient.on("lane:updated", handleLaneUpdated);
     socketClient.on("lane:deleted", handleLaneDeleted);
+    socketClient.on("tag:created", handleTagCreated);
+    socketClient.on("tag:assigned", handleTagAssigned);
+    socketClient.on("tag:unassigned", handleTagUnassigned);
 
     return () => {
       console.log("🔌 Unregistering WebSocket event listeners");
@@ -514,6 +585,9 @@ export const useBoardWebSocket = ({
       socketClient.off("lane:created", handleLaneCreated);
       socketClient.off("lane:updated", handleLaneUpdated);
       socketClient.off("lane:deleted", handleLaneDeleted);
+      socketClient.off("tag:created", handleTagCreated);
+      socketClient.off("tag:assigned", handleTagAssigned);
+      socketClient.off("tag:unassigned", handleTagUnassigned);
     };
-  }, [boardId, setCards, setActiveUsers, loadCards, loadLanes, getCurrentUser]);
+  }, [boardId, setCards, setActiveUsers, availableTags, setAvailableTags, loadCards, loadLanes, getCurrentUser]);
 };

@@ -14,6 +14,8 @@ interface UseBoardActionsParams {
   cards: Card[];
   setCards: React.Dispatch<React.SetStateAction<Card[]>>;
   user: User | null;
+  availableTags?: Tag[];
+  setAvailableTags?: React.Dispatch<React.SetStateAction<Tag[]>>;
 }
 
 export const useBoardActions = ({
@@ -22,6 +24,8 @@ export const useBoardActions = ({
   cards,
   setCards,
   user,
+  availableTags = [],
+  setAvailableTags,
 }: UseBoardActionsParams) => {
   // Track cards being moved to prevent state overwrites
   const movingCardsRef = useRef<Set<string>>(new Set());
@@ -315,23 +319,61 @@ export const useBoardActions = ({
     }
   };
 
-  const handleAddTag = (cardId: string, tag: string) => {
-    setCards(
-      cards.map((card) => {
-        if (card.id !== cardId) return card;
-        if (card.tags.includes(tag)) return card;
-        return { ...card, tags: [...card.tags, tag] };
-      })
-    );
+  const handleAddTag = async (cardId: string, label: string, color?: string) => {
+    if (!boardId) return;
+
+    console.log("🏷️ Adding tag to card:", { cardId, label, color });
+
+    try {
+      // Step 1: Create or find existing tag
+      const newTag = await tagsApi.createTag(boardId, { label, color });
+      console.log("✅ Tag created/found:", newTag);
+
+      // Add to available tags if not already there
+      if (setAvailableTags && !availableTags.find(t => t.id === newTag.id)) {
+        setAvailableTags([...availableTags, newTag]);
+      }
+
+      // Step 2: Assign tag to card
+      await tagsApi.assignTag(boardId, cardId, newTag.id);
+      console.log("✅ Tag assigned to card");
+
+      // Step 3: Update local state (optimistic)
+      setCards(
+        cards.map((card) => {
+          if (card.id !== cardId) return card;
+          // Check if tag already exists
+          if (card.tags.some(t => t.id === newTag.id)) return card;
+          return { ...card, tags: [...card.tags, newTag] };
+        })
+      );
+    } catch (error) {
+      console.error("❌ Failed to add tag:", error);
+    }
   };
 
-  const handleRemoveTag = (cardId: string, tag: string) => {
+  const handleRemoveTag = async (cardId: string, tagId: string) => {
+    if (!boardId) return;
+
+    console.log("🏷️ Removing tag from card:", { cardId, tagId });
+
+    // Optimistic update
+    const previousCards = [...cards];
     setCards(
       cards.map((card) => {
         if (card.id !== cardId) return card;
-        return { ...card, tags: card.tags.filter((t) => t !== tag) };
+        return { ...card, tags: card.tags.filter((t) => t.id !== tagId) };
       })
     );
+
+    try {
+      await tagsApi.unassignTag(boardId, cardId, tagId);
+      console.log("✅ Tag unassigned from card");
+    } catch (error) {
+      console.error("❌ Failed to remove tag:", error);
+      // Revert on error
+      setCards(previousCards);
+    }
   };
 
   return {

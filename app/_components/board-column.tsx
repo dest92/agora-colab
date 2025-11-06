@@ -31,7 +31,7 @@ interface Card {
   comments: Comment[];
   assignedTo?: User;
   timestamp: number;
-  tags: string[];
+  tags: Tag[];
 }
 
 interface Column {
@@ -57,8 +57,8 @@ interface BoardColumnProps {
     priority: "low" | "normal" | "high" | "urgent"
   ) => void;
   onAssignUser: (cardId: string, user: User | undefined) => void;
-  onAddTag: (cardId: string, tag: string) => void;
-  onRemoveTag: (cardId: string, tag: string) => void;
+  onAddTag: (cardId: string, label: string, color?: string) => void;
+  onRemoveTag: (cardId: string, tagId: string) => void;
   currentUser: User;
   activeUsers: User[];
   onDeleteLane?: (laneId: string) => void;
