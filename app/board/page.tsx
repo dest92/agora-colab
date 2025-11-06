@@ -756,7 +756,7 @@ export default function BoardPage() {
                     color: colorClass,
                   }}
                   cards={filteredCards.filter(
-                    (card) => card.column === lane.id
+                    (card) => card.column === lane.name
                   )}
                   onAddCard={boardActions.handleAddCard}
                   onMoveCard={boardActions.handleMoveCard}

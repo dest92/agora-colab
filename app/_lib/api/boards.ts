@@ -139,7 +139,19 @@ class BoardsApi {
    */
   async listCards(boardId: string, query?: ListCardsQuery): Promise<Card[]> {
     const queryString = query?.laneId ? `?laneId=${query.laneId}` : "";
-    return apiClient.get<Card[]>(`/boards/${boardId}/cards${queryString}`);
+    const cards = await apiClient.get<Card[]>(
+      `/boards/${boardId}/cards${queryString}`
+    );
+    console.log("🌐 API returned cards:", {
+      boardId,
+      count: cards.length,
+      cards: cards.map((c) => ({
+        id: c.id,
+        laneId: c.laneId,
+        content: c.content.substring(0, 30),
+      })),
+    });
+    return cards;
   }
 
   /**

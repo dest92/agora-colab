@@ -78,6 +78,11 @@ export const useBoardData = () => {
         count: apiCards.length,
         lanesAvailable: currentLanes.length,
         lanes: currentLanes,
+        apiCards: apiCards.map((c) => ({
+          id: c.id,
+          laneId: c.laneId,
+          content: c.content,
+        })),
       });
 
       const currentUserId = authApi.getCurrentUser()?.id;
@@ -90,6 +95,7 @@ export const useBoardData = () => {
             cardId: apiCard.id,
             laneId: apiCard.laneId,
             mappedColumn: column,
+            content: apiCard.content.substring(0, 20),
           });
 
           const isCurrentUser = apiCard.authorId === currentUserId;
