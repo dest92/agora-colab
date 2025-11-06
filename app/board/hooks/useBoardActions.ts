@@ -4,9 +4,10 @@
  */
 
 import { useState, useRef } from "react";
-import { boardsApi, commentsApi, votesApi, assigneesApi } from "@/app/_lib/api";
+import { boardsApi, commentsApi, votesApi, assigneesApi, tagsApi } from "@/app/_lib/api";
 import { mapColumnToLaneId } from "../utils/boardMappers";
 import type { Card, Comment, User } from "./useBoardData";
+import type { Tag } from "@/app/_lib/api/types";
 
 interface UseBoardActionsParams {
   boardId: string;
