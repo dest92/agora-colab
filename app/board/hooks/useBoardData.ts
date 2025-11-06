@@ -3,7 +3,7 @@
  * Handles loading of lanes, cards, and comments
  */
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import {
   boardsApi,
   commentsApi,
@@ -47,7 +47,7 @@ export const useBoardData = () => {
   const [lanes, setLanes] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const loadLanes = async (boardId: string) => {
+  const loadLanes = useCallback(async (boardId: string) => {
     try {
       const lanesData = await boardsApi.getLanes(boardId);
       const mappedLanes = lanesData.map((lane) => ({
@@ -61,206 +61,209 @@ export const useBoardData = () => {
       console.error("Failed to load lanes:", error);
       return [];
     }
-  };
+  }, []);
 
-  const loadCards = async (
-    boardId: string,
-    currentLanes: { id: string; name: string }[],
-    showLoading: boolean = true
-  ) => {
-    try {
-      if (showLoading) {
-        setLoading(true);
-      }
-      const apiCards = await boardsApi.listCards(boardId);
+  const loadCards = useCallback(
+    async (
+      boardId: string,
+      currentLanes: { id: string; name: string }[],
+      showLoading: boolean = true
+    ) => {
+      try {
+        if (showLoading) {
+          setLoading(true);
+        }
+        const apiCards = await boardsApi.listCards(boardId);
 
-      console.log("📥 Loading cards:", {
-        count: apiCards.length,
-        lanesAvailable: currentLanes.length,
-        lanes: currentLanes,
-        apiCards: apiCards.map((c) => ({
-          id: c.id,
-          laneId: c.laneId,
-          content: c.content,
-        })),
-      });
+        console.log("📥 Loading cards:", {
+          count: apiCards.length,
+          lanesAvailable: currentLanes.length,
+          lanes: currentLanes,
+          apiCards: apiCards.map((c) => ({
+            id: c.id,
+            laneId: c.laneId,
+            content: c.content,
+          })),
+        });
 
-      const currentUserId = authApi.getCurrentUser()?.id;
+        const currentUserId = authApi.getCurrentUser()?.id;
 
-      // Transform API cards to UI cards
-      const uiCards: Card[] = await Promise.all(
-        apiCards.map(async (apiCard) => {
-          const column = mapLaneToColumn(apiCard.laneId, currentLanes);
-          console.log("🗺️ Mapping card:", {
-            cardId: apiCard.id,
-            laneId: apiCard.laneId,
-            mappedColumn: column,
-            content: apiCard.content.substring(0, 20),
-          });
+        // Transform API cards to UI cards
+        const uiCards: Card[] = await Promise.all(
+          apiCards.map(async (apiCard) => {
+            const column = mapLaneToColumn(apiCard.laneId, currentLanes);
+            console.log("🗺️ Mapping card:", {
+              cardId: apiCard.id,
+              laneId: apiCard.laneId,
+              mappedColumn: column,
+              content: apiCard.content.substring(0, 20),
+            });
 
-          const isCurrentUser = apiCard.authorId === currentUserId;
+            const isCurrentUser = apiCard.authorId === currentUserId;
 
-          // Get author info (name, emoji, color)
-          let authorInfo = await getUserInfo(apiCard.authorId);
-          if (isCurrentUser) {
-            authorInfo = {
-              ...authorInfo,
-              name: "You",
-              emoji: "👤",
-              color: "#00AFF0",
-            };
-          }
+            // Get author info (name, emoji, color)
+            let authorInfo = await getUserInfo(apiCard.authorId);
+            if (isCurrentUser) {
+              authorInfo = {
+                ...authorInfo,
+                name: "You",
+                emoji: "👤",
+                color: "#00AFF0",
+              };
+            }
 
-          // Load comments for this card
-          let comments: Comment[] = [];
-          try {
-            const apiComments = await commentsApi.listComments(
-              boardId,
-              apiCard.id
-            );
-            comments = await Promise.all(
-              apiComments.map(async (comment) => {
-                const isCommentAuthorCurrentUser =
-                  comment.authorId === currentUserId;
+            // Load comments for this card
+            let comments: Comment[] = [];
+            try {
+              const apiComments = await commentsApi.listComments(
+                boardId,
+                apiCard.id
+              );
+              comments = await Promise.all(
+                apiComments.map(async (comment) => {
+                  const isCommentAuthorCurrentUser =
+                    comment.authorId === currentUserId;
 
-                let commentAuthorInfo = await getUserInfo(comment.authorId);
-                if (isCommentAuthorCurrentUser) {
-                  commentAuthorInfo = {
-                    ...commentAuthorInfo,
+                  let commentAuthorInfo = await getUserInfo(comment.authorId);
+                  if (isCommentAuthorCurrentUser) {
+                    commentAuthorInfo = {
+                      ...commentAuthorInfo,
+                      name: "You",
+                      emoji: "👤",
+                      color: "#00AFF0",
+                    };
+                  }
+
+                  return {
+                    id: comment.id,
+                    author: {
+                      name: commentAuthorInfo.name,
+                      email: comment.authorId,
+                      emoji: commentAuthorInfo.emoji,
+                      color: commentAuthorInfo.color,
+                    },
+                    content: comment.content,
+                    timestamp: new Date(comment.createdAt).getTime(),
+                  };
+                })
+              );
+            } catch (error) {
+              console.error(
+                `❌ Failed to load comments for card ${apiCard.id}:`,
+                error
+              );
+            }
+
+            // Load votes for this card
+            let likes: string[] = [];
+            let dislikes: string[] = [];
+            try {
+              const voters = await votesApi.getVoters(boardId, apiCard.id);
+
+              // Convert voter IDs to display names
+              for (const voter of voters) {
+                const voterInfo = await getUserInfo(voter.voterId);
+                if (voter.weight === 1) {
+                  likes.push(voterInfo.name);
+                } else if (voter.weight === -1) {
+                  dislikes.push(voterInfo.name);
+                }
+              }
+
+              console.log(`✅ Loaded votes for card ${apiCard.id}:`, {
+                likes,
+                dislikes,
+              });
+            } catch (error) {
+              console.error(
+                `❌ Failed to load votes for card ${apiCard.id}:`,
+                error
+              );
+            }
+
+            // Load assignees for this card
+            let assignedTo: User | undefined = undefined;
+            try {
+              console.log(`🔄 Loading assignees for card ${apiCard.id}...`);
+              const assignees = await assigneesApi.getAssignees(
+                boardId,
+                apiCard.id
+              );
+
+              console.log(
+                `📥 Assignees response for card ${apiCard.id}:`,
+                assignees
+              );
+
+              // For now, we only support one assignee (the first one)
+              if (assignees.length > 0) {
+                const assignee = assignees[0];
+                const isAssigneeCurrentUser = assignee.userId === currentUserId;
+
+                let assigneeInfo = await getUserInfo(assignee.userId);
+                if (isAssigneeCurrentUser) {
+                  assigneeInfo = {
+                    ...assigneeInfo,
                     name: "You",
                     emoji: "👤",
                     color: "#00AFF0",
                   };
                 }
 
-                return {
-                  id: comment.id,
-                  author: {
-                    name: commentAuthorInfo.name,
-                    email: comment.authorId,
-                    emoji: commentAuthorInfo.emoji,
-                    color: commentAuthorInfo.color,
-                  },
-                  content: comment.content,
-                  timestamp: new Date(comment.createdAt).getTime(),
+                assignedTo = {
+                  name: assigneeInfo.name,
+                  emoji: assigneeInfo.emoji,
+                  color: assigneeInfo.color,
+                  id: assignee.userId,
                 };
-              })
-            );
-          } catch (error) {
-            console.error(
-              `❌ Failed to load comments for card ${apiCard.id}:`,
-              error
-            );
-          }
 
-          // Load votes for this card
-          let likes: string[] = [];
-          let dislikes: string[] = [];
-          try {
-            const voters = await votesApi.getVoters(boardId, apiCard.id);
-
-            // Convert voter IDs to display names
-            for (const voter of voters) {
-              const voterInfo = await getUserInfo(voter.voterId);
-              if (voter.weight === 1) {
-                likes.push(voterInfo.name);
-              } else if (voter.weight === -1) {
-                dislikes.push(voterInfo.name);
+                console.log(
+                  `✅ Loaded assignee for card ${apiCard.id}:`,
+                  assignedTo
+                );
+              } else {
+                console.log(`ℹ️ No assignees found for card ${apiCard.id}`);
               }
+            } catch (error) {
+              console.error(
+                `❌ Failed to load assignees for card ${apiCard.id}:`,
+                error
+              );
             }
 
-            console.log(`✅ Loaded votes for card ${apiCard.id}:`, {
+            return {
+              id: apiCard.id,
+              content: apiCard.content,
+              author: {
+                name: authorInfo.name,
+                email: apiCard.authorId,
+                emoji: authorInfo.emoji,
+                color: authorInfo.color,
+              },
+              column,
+              priority: apiCard.priority,
               likes,
               dislikes,
-            });
-          } catch (error) {
-            console.error(
-              `❌ Failed to load votes for card ${apiCard.id}:`,
-              error
-            );
-          }
+              comments,
+              assignedTo,
+              timestamp: new Date(apiCard.createdAt).getTime(),
+              tags: [],
+            };
+          })
+        );
 
-          // Load assignees for this card
-          let assignedTo: User | undefined = undefined;
-          try {
-            console.log(`🔄 Loading assignees for card ${apiCard.id}...`);
-            const assignees = await assigneesApi.getAssignees(
-              boardId,
-              apiCard.id
-            );
-
-            console.log(
-              `📥 Assignees response for card ${apiCard.id}:`,
-              assignees
-            );
-
-            // For now, we only support one assignee (the first one)
-            if (assignees.length > 0) {
-              const assignee = assignees[0];
-              const isAssigneeCurrentUser = assignee.userId === currentUserId;
-
-              let assigneeInfo = await getUserInfo(assignee.userId);
-              if (isAssigneeCurrentUser) {
-                assigneeInfo = {
-                  ...assigneeInfo,
-                  name: "You",
-                  emoji: "👤",
-                  color: "#00AFF0",
-                };
-              }
-
-              assignedTo = {
-                name: assigneeInfo.name,
-                emoji: assigneeInfo.emoji,
-                color: assigneeInfo.color,
-                id: assignee.userId,
-              };
-
-              console.log(
-                `✅ Loaded assignee for card ${apiCard.id}:`,
-                assignedTo
-              );
-            } else {
-              console.log(`ℹ️ No assignees found for card ${apiCard.id}`);
-            }
-          } catch (error) {
-            console.error(
-              `❌ Failed to load assignees for card ${apiCard.id}:`,
-              error
-            );
-          }
-
-          return {
-            id: apiCard.id,
-            content: apiCard.content,
-            author: {
-              name: authorInfo.name,
-              email: apiCard.authorId,
-              emoji: authorInfo.emoji,
-              color: authorInfo.color,
-            },
-            column,
-            priority: apiCard.priority,
-            likes,
-            dislikes,
-            comments,
-            assignedTo,
-            timestamp: new Date(apiCard.createdAt).getTime(),
-            tags: [],
-          };
-        })
-      );
-
-      console.log("✅ Cards loaded and mapped:", uiCards.length);
-      setCards(uiCards);
-    } catch (error) {
-      console.error("❌ Failed to load cards:", error);
-    } finally {
-      if (showLoading) {
-        setLoading(false);
+        console.log("✅ Cards loaded and mapped:", uiCards.length);
+        setCards(uiCards);
+      } catch (error) {
+        console.error("❌ Failed to load cards:", error);
+      } finally {
+        if (showLoading) {
+          setLoading(false);
+        }
       }
-    }
-  };
+    },
+    []
+  );
 
   return {
     cards,

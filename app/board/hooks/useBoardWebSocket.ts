@@ -362,24 +362,36 @@ export const useBoardWebSocket = ({
     };
 
     const handleLaneCreated = async (payload: any) => {
+      console.log("🚨🚨🚨 LANE CREATED EVENT RECEIVED 🚨🚨🚨");
       console.log("Lane created event:", payload);
 
-      const { laneId } = payload;
+      const { laneId, name } = payload;
+
+      console.log("📊 Current lanes before update:", {
+        count: lanesRef.current.length,
+        lanes: lanesRef.current,
+      });
 
       // Check if the lane already exists in current state
       const laneExists = lanesRef.current.some((l) => l.id === laneId);
 
       if (laneExists) {
-        console.log("Lane already in UI (optimistic update)");
+        console.log("✅ Lane already in UI (optimistic update)");
         return;
       }
 
+      console.log("🔄 Reloading lanes for other users...");
+
       // Reload lanes to show the new lane (for other users)
       if (boardId) {
-        await loadLanes(boardId);
+        const updatedLanes = await loadLanes(boardId);
+        console.log("✅ Lanes reloaded:", {
+          count: updatedLanes.length,
+          lanes: updatedLanes,
+        });
       }
 
-      console.log("Lanes updated after lane creation");
+      console.log("✅ Lanes updated after lane creation");
     };
 
     const handleLaneUpdated = async (payload: any) => {
@@ -493,5 +505,5 @@ export const useBoardWebSocket = ({
       socketClient.off("lane:updated", handleLaneUpdated);
       socketClient.off("lane:deleted", handleLaneDeleted);
     };
-  }, [boardId, setCards, setActiveUsers, loadCards, getCurrentUser]);
+  }, [boardId, setCards, setActiveUsers, loadCards, loadLanes, getCurrentUser]);
 };
