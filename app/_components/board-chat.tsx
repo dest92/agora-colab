@@ -52,7 +52,7 @@ export function BoardChat({
       setSending(true);
       const message = await chatApi.sendMessage(boardId, { content });
       console.log("✉️ Sent message response:", message);
-      setMessages((prev) => [...prev, message]);
+      // Don't add optimistically - the WebSocket event will add it
       if (onNewMessage) {
         onNewMessage(message);
       }
@@ -67,7 +67,7 @@ export function BoardChat({
   const handleDeleteMessage = async (messageId: string) => {
     try {
       await chatApi.deleteMessage(boardId, messageId);
-      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      // Don't update state here - the WebSocket event will handle it
       if (onDeleteMessage) {
         onDeleteMessage(messageId);
       }
