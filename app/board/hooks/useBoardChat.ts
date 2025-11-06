@@ -17,6 +17,7 @@ export const useBoardChat = ({ boardId }: UseBoardChatParams) => {
     if (!boardId) return;
     try {
       const data = await chatApi.listMessages(boardId);
+      console.log("📨 Loaded chat messages:", data);
       setMessages(data);
     } catch (error) {
       console.error("Failed to load chat messages:", error);
@@ -26,13 +27,17 @@ export const useBoardChat = ({ boardId }: UseBoardChatParams) => {
   useEffect(() => {
     if (!boardId) return;
 
+    console.log("🔌 [CHAT] Registering chat event listeners for board:", boardId);
+    console.log("🔌 [CHAT] Socket connected:", socketClient.isConnected());
+
     const handleMessageSent = (payload: any) => {
-      console.log("Chat message sent event:", payload);
+      console.log("💬 [CHAT] Chat message sent event:", payload);
 
       const newMessage: ChatMessage = {
         id: payload.id,
         boardId: payload.boardId,
         userId: payload.userId,
+        userName: payload.userName,
         content: payload.content,
         createdAt: payload.createdAt,
         updatedAt: payload.createdAt,
@@ -40,13 +45,17 @@ export const useBoardChat = ({ boardId }: UseBoardChatParams) => {
 
       setMessages((prev) => {
         const exists = prev.some((m) => m.id === newMessage.id);
-        if (exists) return prev;
+        if (exists) {
+          console.log("💬 [CHAT] Message already exists, skipping");
+          return prev;
+        }
+        console.log("💬 [CHAT] Adding new message to state");
         return [...prev, newMessage];
       });
     };
 
     const handleMessageDeleted = (payload: any) => {
-      console.log("Chat message deleted event:", payload);
+      console.log("🗑️ [CHAT] Chat message deleted event:", payload);
 
       const { messageId } = payload;
       setMessages((prev) => prev.filter((m) => m.id !== messageId));
@@ -56,6 +65,7 @@ export const useBoardChat = ({ boardId }: UseBoardChatParams) => {
     socketClient.on("chat:message:deleted", handleMessageDeleted);
 
     return () => {
+      console.log("🔌 [CHAT] Unregistering chat event listeners");
       socketClient.off("chat:message:sent", handleMessageSent);
       socketClient.off("chat:message:deleted", handleMessageDeleted);
     };

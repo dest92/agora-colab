@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { MessageSquare, Send, X, Trash2 } from "lucide-react";
 import { chatApi, authApi, type ChatMessage } from "@/app/_lib/api";
+import { useBoardChat } from "@/app/board/hooks/useBoardChat";
 import { getUserInfo } from "@/app/board/utils/userCache";
 import { Input } from "./ui/input";
 
@@ -18,12 +19,14 @@ export function BoardChat({
   onDeleteMessage,
 }: BoardChatProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const currentUserId = authApi.getCurrentUser()?.id;
+
+  // Use the WebSocket-enabled chat hook
+  const { messages, setMessages, loadMessages } = useBoardChat({ boardId });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -33,23 +36,11 @@ export function BoardChat({
     if (isOpen && messages.length === 0) {
       loadMessages();
     }
-  }, [isOpen]);
+  }, [isOpen, loadMessages, messages.length]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
-  const loadMessages = async () => {
-    try {
-      setLoading(true);
-      const data = await chatApi.listMessages(boardId);
-      setMessages(data);
-    } catch (error) {
-      console.error("Failed to load messages:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || sending) return;
@@ -60,6 +51,7 @@ export function BoardChat({
     try {
       setSending(true);
       const message = await chatApi.sendMessage(boardId, { content });
+      console.log("✉️ Sent message response:", message);
       setMessages((prev) => [...prev, message]);
       if (onNewMessage) {
         onNewMessage(message);
@@ -169,7 +161,9 @@ export function BoardChat({
                     >
                       <div className="flex items-start justify-between gap-2 mb-1">
                         <span className="text-xs font-semibold opacity-80">
-                          {isOwnMessage ? "You" : message.userId}
+                          {isOwnMessage
+                            ? "You"
+                            : message.userName || message.userId}
                         </span>
                         {isOwnMessage && (
                           <button
