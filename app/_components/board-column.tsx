@@ -6,6 +6,7 @@ import { useState } from "react";
 import { BoardCard } from "./board-card";
 import { Textarea } from "./ui/textarea";
 import { Plus, X, Trash2 } from "lucide-react";
+import type { Tag } from "@/app/_lib/api";
 
 interface User {
   name: string;
@@ -31,7 +32,7 @@ interface Card {
   comments: Comment[];
   assignedTo?: User;
   timestamp: number;
-  tags: string[];
+  tags: Tag[];
 }
 
 interface Column {
@@ -57,8 +58,8 @@ interface BoardColumnProps {
     priority: "low" | "normal" | "high" | "urgent"
   ) => void;
   onAssignUser: (cardId: string, user: User | undefined) => void;
-  onAddTag: (cardId: string, tag: string) => void;
-  onRemoveTag: (cardId: string, tag: string) => void;
+  onAddTag: (cardId: string, label: string, color?: string) => void;
+  onRemoveTag: (cardId: string, tagId: string) => void;
   currentUser: User;
   activeUsers: User[];
   onDeleteLane?: (laneId: string) => void;

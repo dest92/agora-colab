@@ -79,7 +79,7 @@ export default function BoardPage() {
   } | null>(null);
 
   // Custom hooks for data management
-  const { cards, setCards, lanes, setLanes, loading, loadLanes, loadCards } =
+  const { cards, setCards, lanes, setLanes, availableTags, setAvailableTags, loading, loadLanes, loadCards, loadTags } =
     useBoardData();
 
   const boardActions = useBoardActions({
@@ -88,6 +88,8 @@ export default function BoardPage() {
     cards,
     setCards,
     user,
+    availableTags,
+    setAvailableTags,
   });
 
   // WebSocket connection and listeners
@@ -98,6 +100,8 @@ export default function BoardPage() {
     cards,
     setCards,
     setActiveUsers,
+    availableTags,
+    setAvailableTags,
     loadLanes,
     loadCards,
     getCurrentUser,
@@ -139,6 +143,7 @@ export default function BoardPage() {
 
     const initializeBoard = async () => {
       const loadedLanes = await loadLanes(selectedBoard);
+      await loadTags(selectedBoard);
       await loadCards(selectedBoard, loadedLanes);
     };
     initializeBoard();
@@ -363,7 +368,7 @@ export default function BoardPage() {
       card.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
       card.author.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       card.tags.some((tag) =>
-        tag.toLowerCase().includes(searchQuery.toLowerCase())
+        tag.label.toLowerCase().includes(searchQuery.toLowerCase())
       );
 
     const matchesPriority =
