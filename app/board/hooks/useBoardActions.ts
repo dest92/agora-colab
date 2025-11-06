@@ -36,15 +36,23 @@ export const useBoardActions = ({
       return;
     }
 
+    // Find the lane name for the column
+    const lane = lanes.find((l) => l.id === laneId);
+    if (!lane) {
+      console.error("❌ Cannot find lane for ID:", laneId);
+      return;
+    }
+
     // Generate temporary ID for optimistic update
     const tempId = `temp-${Date.now()}`;
 
     // Optimistic update: Add card to local state IMMEDIATELY
+    // Use lane.name for column to match the filter
     const optimisticCard: Card = {
       id: tempId,
       content,
       author: user,
-      column: columnId,
+      column: lane.name, // Use lane name instead of columnId
       priority,
       likes: [],
       dislikes: [],
